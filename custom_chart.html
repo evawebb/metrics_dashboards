@@ -17,16 +17,19 @@
             'InProgressDate',
             'AcceptedDate',
             'Tags',
-            'RevisionHistory'
+            'RevisionHistory',
+            'Revisions'
           ],
           columns: {
-            'FormattedID': { 'key': 'FormattedID',    'center': true },
-            'Type':        { 'key': '_type',          'center': true },
-            'Name':        { 'key': 'Name',           'center': false },
-            'Estimate':    { 'key': 'PlanEstimate',   'center': true },
-            'Created':     { 'key': 'CreationDate',   'center': true, 'date': true },
-            'Started':     { 'key': 'InProgressDate', 'center': true, 'date': true },
-            'Accepted':    { 'key': 'AcceptedDate',   'center': true, 'date': true }
+            'FormattedID': { key: 'FormattedID',    center: true },
+            'Type':        { key: '_type',          center: true },
+            'Name':        { key: 'Name',           center: false },
+            'Estimate':    { key: 'PlanEstimate',   center: true },
+            'Created':     { key: 'CreationDate',   center: true, date: true },
+            'Started':     { key: 'InProgressDate', center: true, date: true },
+            'Completed':   { key: 'CompletedDate',  center: true, date: true },
+            'Accepted':    { key: 'AcceptedDate',   center: true, date: true },
+            'Released':    { key: 'ReleasedDate',   center: true, date: true}
           },
 
           launch: function() {
@@ -60,17 +63,10 @@
 
             var store = Ext.create('Rally.data.wsapi.Store', {
               model: 'Iteration',
-              fetch: ['Name'],
-              context: this.getContext().getDataContext(),
-              pageSize: 10,
-              limit: 10,
-              sorters: [{
-                property: 'StartDate',
-                direction: 'ASC'
-              }]
+              fetch: ['Name']
             }, this);
             store.addFilter([start_filter, end_filter], false);
-            store.loadPage(1, {
+            store.load({
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
@@ -80,7 +76,7 @@
                       value: r.get('Name')
                     });
                   });
-                  this.fetch_stories(filters, 0, []);
+                  this.fetch_stories(filters, []);
                 }
               }
             });
@@ -88,26 +84,135 @@
 
           // Recursively fetch stories for each iteration filter and add them
           // all together.
-          fetch_stories: function(filters, index, stories) {
-            if (index < filters.length) {
-              var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-                models: ['UserStory', 'Defect'],
-                fetch: this.data_keys,
-                limit: Infinity
-              }, this);
-              store.addFilter(filters[index])
-              store.load({
-                scope: this,
-                callback: function(records, operation) {
-                  this.fetch_stories(filters, index + 1,
+          fetch_stories: function(filters, stories) {
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+              models: ['UserStory', 'Defect'],
+              fetch: this.data_keys
+            }, this);
+            store.addFilter(filters[0])
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                filters.shift();
+                if (filters.length > 0) {
+                  this.fetch_stories(filters,
                     operation.wasSuccessful() ?
                       stories.concat(records) :
                       stories
                   );
+                } else {
+                  this.fetch_revisions(stories, 0);
                 }
-              });
+              }
+            });
+          },
+
+          // Recursively fetch the revisions for each story.
+          fetch_revisions: function(stories, index) {
+            var story = stories[index];
+            var rh_split = story.get('RevisionHistory')._ref.split('/');
+            var rh_oid = parseInt(rh_split[rh_split.length - 1]);
+            var store = Ext.create('Rally.data.wsapi.Store', {
+              model: 'Revision',
+              sorters: [{
+                property: 'RevisionNumber',
+                direction: 'ASC'
+              }]
+            }, this);
+            var rh_filter = Ext.create('Rally.data.wsapi.Filter', {
+              property: 'RevisionHistory.ObjectID',
+              value: rh_oid
+            });
+            store.addFilter(rh_filter);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                if (operation.wasSuccessful()) {
+                  story.data.Revisions = records.map(function(r) {
+                    return r.data;
+                  });
+                }
+
+                if (index < stories.length - 1) {
+                  this.fetch_revisions(stories, index + 1);
+                } else {
+                  this.get_story_data(stories, []);
+                }
+              }
+            });
+          },
+
+          // Recursively reformat the data for each story. Once they're all
+          // reformatted, pass the data along to the table building function.
+          get_story_data: function(stories, all_data) {
+            var story = stories[0];
+            var data = {};
+            this.data_keys.forEach(function(k) {
+              data[k] = story.get(k);
+            });
+
+            // Make the tags readable.
+            data.Tags = data.Tags._tagsNameArray.map(function(o) {
+              return o.Name;
+            });
+
+            // Make the type more readable.
+            // Color the row based on the type.
+            if (data._type == 'hierarchicalrequirement') {
+              data._type = 'S';
+              data.color = '#ffffff';
+            } else if (data._type == 'defect') {
+              if (data.Tags.indexOf('Customer Voice') == -1) {
+                data._type = 'D';
+                data.color = '#ffa500';
+              } else {
+                data._type = 'C';
+                data.color = '#ff83fa';
+              }
+            }
+
+            // Calculate the Completed and Released dates from the revisions.
+            var completed, released;
+            data.Revisions.forEach(function(r) {
+              var m = r.Description
+                .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
+              if (m && data.FormattedID == 'DE26197') {
+                console.log(m[0]);
+              }
+              if (m) {
+                if (m[2] == 'Idea') {
+                  completed = null;
+                  released = null;
+                } else if (m[2] == 'Defined') {
+                  completed = null;
+                  released = null;
+                } else if (m[2] == 'In-Progress') {
+                  completed = null;
+                  released = null;
+                } else if (m[2] == 'Completed') {
+                  completed = r.CreationDate;
+                  released = null;
+                } else if (m[2] == 'Accepted') {
+                  released = null;
+                } else if (m[2] == 'Released') {
+                  released = r.CreationDate;
+                }
+              }
+            });
+            if (completed) {
+              data.CompletedDate = completed;
+            }
+            if (released) {
+              data.ReleasedDate = released;
+            }
+
+            // Process the next story.
+            all_data.push(data);
+            stories.shift();
+            if (stories.length > 0) {
+              this.get_story_data(stories, all_data);
             } else {
-              this.build_table(stories);
+              this.build_table(all_data);
             }
           },
 
@@ -132,22 +237,23 @@
 
           // Given a story object, build an HTML row showing the relevant data.
           build_table_row: function(story) {
-            var data = this.get_story_data(story);
+            console.log(story);
+            var data = story;
             var row = '<tr>';
             var that = this;
 
             Object.keys(this.columns).forEach(function(col) {
-              var datum = data[that.columns[col]['key']];
-              var center = that.columns[col]['center'];
+              var datum = data[that.columns[col].key];
+              var center = that.columns[col].center;
               if (!datum) {
                 datum = '';
-              } else if (that.columns[col]['date']) {
+              } else if (that.columns[col].date) {
                 datum = datum.toDateString();
               }
 
               row += ('<td ' +
                 (center ? 'class = "center" ' : '') +
-                ('bgcolor="' + data['color'] + '" ') +
+                ('bgcolor="' + data.color + '" ') +
                 '>' +
                 datum +
                 '</td>'
@@ -155,39 +261,6 @@
             });
 
             return row;
-          },
-
-          // Fetch the necessary data out of the story object, and add any other
-          // calculated or derived data points.
-          get_story_data: function(story) {
-            var data = {};
-            this.data_keys.forEach(function(k) {
-              data[k] = story.get(k);
-            });
-
-            // Make the tags readable.
-            data['Tags'] = data['Tags']['_tagsNameArray'].map(function(o) {
-              return o['Name'];
-            });
-
-            // Make the type more readable.
-            // Color the row based on the type.
-            if (data['_type'] == 'hierarchicalrequirement') {
-              data['_type'] = 'S';
-              data['color'] = '#ffffff';
-            } else if (data['_type'] == 'defect') {
-              if (data['Tags'].indexOf('Customer Voice') == -1) {
-                data['_type'] = 'D';
-                data['color'] = '#ffa500';
-              } else {
-                data['_type'] = 'C';
-                data['color'] = '#ff83fa';
-              }
-            }
-
-            // Testing.
-
-            return data;
           }
         });
 
