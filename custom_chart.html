@@ -13,9 +13,6 @@
             '_type',
             'Name',
             'PlanEstimate',
-            'CreationDate',
-            'InProgressDate',
-            'AcceptedDate',
             'Tags',
             'RevisionHistory',
             'Revisions'
@@ -25,8 +22,8 @@
             'Type':        { key: '_type',          center: true },
             'Name':        { key: 'Name',           center: false },
             'Estimate':    { key: 'PlanEstimate',   center: true },
-            'Created':     { key: 'CreationDate',   center: true, date: true },
-            'Started':     { key: 'InProgressDate', center: true, date: true },
+            'Created':     { key: 'CreatedDate',    center: true, date: true },
+            'Started':     { key: 'StartedDate',    center: true, date: true },
             'Completed':   { key: 'CompletedDate',  center: true, date: true },
             'Accepted':    { key: 'AcceptedDate',   center: true, date: true },
             'Released':    { key: 'ReleasedDate',   center: true, date: true}
@@ -144,75 +141,94 @@
 
           // Recursively reformat the data for each story. Once they're all
           // reformatted, pass the data along to the table building function.
-          get_story_data: function(stories, all_data) {
-            var story = stories[0];
-            var data = {};
+          get_story_data: function(raw_stories, stories) {
+            var raw_story = raw_stories[0];
+            var story = {};
             this.data_keys.forEach(function(k) {
-              data[k] = story.get(k);
+              story[k] = raw_story.get(k);
             });
 
             // Make the tags readable.
-            data.Tags = data.Tags._tagsNameArray.map(function(o) {
+            story.Tags = story.Tags._tagsNameArray.map(function(o) {
               return o.Name;
             });
 
             // Make the type more readable.
             // Color the row based on the type.
-            if (data._type == 'hierarchicalrequirement') {
-              data._type = 'S';
-              data.color = '#ffffff';
-            } else if (data._type == 'defect') {
-              if (data.Tags.indexOf('Customer Voice') == -1) {
-                data._type = 'D';
-                data.color = '#ffa500';
+            if (story._type == 'hierarchicalrequirement') {
+              story._type = 'S';
+              story.color = '#ffffff';
+            } else if (story._type == 'defect') {
+              if (story.Tags.indexOf('Customer Voice') == -1) {
+                story._type = 'D';
+                story.color = '#ffa500';
               } else {
-                data._type = 'C';
-                data.color = '#ff83fa';
+                story._type = 'C';
+                story.color = '#ff83fa';
               }
             }
 
-            // Calculate the Completed and Released dates from the revisions.
-            var completed, released;
-            data.Revisions.forEach(function(r) {
-              var m = r.Description
-                .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
-              if (m && data.FormattedID == 'DE26197') {
-                console.log(m[0]);
-              }
-              if (m) {
-                if (m[2] == 'Idea') {
-                  completed = null;
-                  released = null;
-                } else if (m[2] == 'Defined') {
-                  completed = null;
-                  released = null;
-                } else if (m[2] == 'In-Progress') {
-                  completed = null;
-                  released = null;
-                } else if (m[2] == 'Completed') {
-                  completed = r.CreationDate;
-                  released = null;
-                } else if (m[2] == 'Accepted') {
-                  released = null;
-                } else if (m[2] == 'Released') {
-                  released = r.CreationDate;
+            // Calculate the transition dates.
+            var created, started, completed, accepted, released;
+            story.Revisions.forEach(function(r) {
+              if (r.Description == 'Original revision') {
+                created = r.CreationDate;
+              } else {
+                var m = r.Description
+                  .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
+
+                if (m) {
+                  if (m[2] == 'Idea') {
+                    started = null;
+                    completed = null;
+                    accepted = null;
+                    released = null;
+                  } else if (m[2] == 'Defined') {
+                    started = null;
+                    completed = null;
+                    accepted = null;
+                    released = null;
+                  } else if (m[2] == 'In-Progress') {
+                    started = r.CreationDate;
+                    completed = null;
+                    accepted = null;
+                    released = null;
+                  } else if (m[2] == 'Completed') {
+                    completed = r.CreationDate;
+                    accepted = null;
+                    released = null;
+                  } else if (m[2] == 'Accepted') {
+                    accepted = r.CreationDate;
+                    released = null;
+                  } else if (m[2] == 'Released') {
+                    released = r.CreationDate;
+                  }
                 }
               }
             });
+            if (created) {
+              story.CreatedDate = created;
+            }
+            if (started) {
+              story.StartedDate = started;
+            }
             if (completed) {
-              data.CompletedDate = completed;
+              story.CompletedDate = completed;
+            }
+            if (accepted) {
+              story.AcceptedDate = accepted;
             }
             if (released) {
-              data.ReleasedDate = released;
+              story.ReleasedDate = released;
             }
 
             // Process the next story.
-            all_data.push(data);
-            stories.shift();
-            if (stories.length > 0) {
-              this.get_story_data(stories, all_data);
+            stories.push(story);
+            raw_stories.shift();
+            if (raw_stories.length > 0) {
+              this.get_story_data(raw_stories, stories);
             } else {
-              this.build_table(all_data);
+              this.build_table(stories);
             }
           },
 
@@ -237,7 +253,6 @@
 
           // Given a story object, build an HTML row showing the relevant data.
           build_table_row: function(story) {
-            console.log(story);
             var data = story;
             var row = '<tr>';
             var that = this;
