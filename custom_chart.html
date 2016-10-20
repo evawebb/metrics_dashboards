@@ -13,23 +13,27 @@
             '_type',
             'Name',
             'PlanEstimate',
+            'Resolution',
             'Tags',
             'RevisionHistory',
             'Revisions'
           ],
           columns: {
-            'FormattedID': { key: 'FormattedID',    center: true },
-            'Type':        { key: '_type',          center: true },
-            'Name':        { key: 'Name',           center: false },
-            'Estimate':    { key: 'PlanEstimate',   center: true },
-            'Created':     { key: 'CreatedDate',    center: true, date: true },
-            'Defined':     { key: 'DefinedDate',    center: true, date: true },
-            'Started':     { key: 'StartedDate',    center: true, date: true },
-            'Completed':   { key: 'CompletedDate',  center: true, date: true },
-            'Accepted':    { key: 'AcceptedDate',   center: true, date: true },
-            'Released':    { key: 'ReleasedDate',   center: true, date: true },
-            'Backtracks':  { key: 'BackCount',      center: true },
-            'Lead Time':   { key: 'LeadTime',       center: true }
+            'FormattedID':     { key: 'FormattedID',    center: true },
+            'Type':            { key: '_type',          center: true },
+            'Name':            { key: 'Name',           center: false },
+            'Estimate':        { key: 'PlanEstimate',   center: true },
+            'Created':         { key: 'CreatedDate',    center: true, date: true },
+            'Defined':         { key: 'DefinedDate',    center: true, date: true },
+            'Started':         { key: 'StartedDate',    center: true, date: true },
+            'Completed':       { key: 'CompletedDate',  center: true, date: true },
+            'Accepted':        { key: 'AcceptedDate',   center: true, date: true },
+            'Released':        { key: 'ReleasedDate',   center: true, date: true },
+            'Backtracks':      { key: 'BackCount',      center: true },
+            'Lead Time':       { key: 'LeadTime',       center: true },
+            'Lead Time Ceil':  { key: 'LeadTimeCeil',   center: true },
+            'Lead Time Round': { key: 'LeadTimeRound',  center: true },
+            'Resolution':      { key: 'Resolution',     center: false }
           },
 
           launch: function() {
@@ -157,26 +161,39 @@
           },
 
           // Given a millisecond count, format it as 'X days, Y hours'.
-          format_ms: function(ms) {
+          format_ms: function(ms, method = null) {
             var hours = Math.round(ms / 1000 / 60 / 60);
             var days = Math.floor(hours / 24);
             hours -= (days * 24);
+
+            if (method == 'ceil') {
+              days += (hours > 0) ? 1 : 0;
+            } else if (method == 'round') {
+              days += (hours >= 12) ? 1 : 0;
+            }
+
             var out = '';
 
             if (days > 0) {
               out += days;
               if (days == 1) {
-                out += ' day, ';
+                out += ' day';
               } else {
-                out += ' days, ';
+                out += ' days';
+              }
+
+              if (!method) {
+                out += ', ';
               }
             }
 
-            out += hours;
-            if (hours == 1) {
-              out += ' hour';
-            } else {
-              out += ' hours';
+            if (!method) {
+              out += hours;
+              if (hours == 1) {
+                out += ' hour';
+              } else {
+                out += ' hours';
+              }
             }
 
             return out;
@@ -216,14 +233,14 @@
             var back_count = 0;
             var back_flag = false;
             story.Revisions.forEach(function(r) {
+              var ms = r.Description
+                .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
+
               if (r.Description == 'Original revision') {
                 dates[0] = r.CreationDate;
-              } else {
-                var m = r.Description
-                  .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
-
-                if (m && indices.indexOf(m[2]) >= 0) {
-                  var i = indices.indexOf(m[2]);
+              } else if (ms && indices.indexOf(ms[2]) >= 0) {
+                if (ms && indices.indexOf(ms[2]) >= 0) {
+                  var i = indices.indexOf(ms[2]);
                   dates[i] = r.CreationDate;
                   for (var j = i + 1; j < indices.length; j += 1) {
                     if (!back_flag && dates[j]) {
@@ -262,6 +279,8 @@
               this.total_lead_ms += lead_ms;
               this.count_lead_times += 1;
               story.LeadTime = this.format_ms(lead_ms);
+              story.LeadTimeCeil = this.format_ms(lead_ms, 'ceil');
+              story.LeadTimeRound = this.format_ms(lead_ms, 'round');
             }
 
             // Record the release date so that cycle time can be calculated.
