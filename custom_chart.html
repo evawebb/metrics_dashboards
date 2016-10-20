@@ -31,7 +31,6 @@
             'Backtracks':  { key: 'BackCount',      center: true },
             'Lead Time':   { key: 'LeadTime',       center: true }
           },
-          total_lead_ms: 0,
 
           launch: function() {
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -49,6 +48,15 @@
           // Create a list of filters, one for each iteration in the selected
           // quarter.
           fetch_iterations: function(ts) {
+            this.total_lead_ms = 0;
+            this.count_lead_times = 0;
+            this.avg_lead_time = '';
+            this.release_dates = [];
+            this.avg_cycle_time = '';
+            this.num_iterations = 0;
+            this.total_throughput = 0;
+            this.avg_throughput = 0;
+
             var start = ts.record.raw.ReleaseStartDate;
             var end = ts.record.raw.ReleaseDate;
             var start_filter = Ext.create('Rally.data.wsapi.Filter', {
@@ -64,19 +72,24 @@
 
             var store = Ext.create('Rally.data.wsapi.Store', {
               model: 'Iteration',
-              fetch: ['Name']
+              fetch: ['Name', 'StartDate']
             }, this);
             store.addFilter([start_filter, end_filter], false);
             store.load({
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
+                  this.num_iterations = records.filter(function(r) {
+                    return r.get('StartDate').getTime() < Date.now();
+                  }).length;
+
                   var filters = records.map(function(r) {
                     return Ext.create('Rally.data.wsapi.Filter', {
                       property: 'Iteration.Name',
                       value: r.get('Name')
                     });
                   });
+
                   this.fetch_stories(filters, []);
                 }
               }
@@ -141,6 +154,32 @@
                 }
               }
             });
+          },
+
+          // Given a millisecond count, format it as 'X days, Y hours'.
+          format_ms: function(ms) {
+            var hours = Math.round(ms / 1000 / 60 / 60);
+            var days = Math.floor(hours / 24);
+            hours -= (days * 24);
+            var out = '';
+
+            if (days > 0) {
+              out += days;
+              if (days == 1) {
+                out += ' day, ';
+              } else {
+                out += ' days, ';
+              }
+            }
+
+            out += hours;
+            if (hours == 1) {
+              out += ' hour';
+            } else {
+              out += ' hours';
+            }
+
+            return out;
           },
 
           // Recursively reformat the data for each story. Once they're all
@@ -221,26 +260,13 @@
             if (story.StartedDate && story.ReleasedDate) {
               var lead_ms = story.ReleasedDate - story.StartedDate;
               this.total_lead_ms += lead_ms;
+              this.count_lead_times += 1;
+              story.LeadTime = this.format_ms(lead_ms);
+            }
 
-              var lead_hours = Math.floor(lead_ms / 1000 / 60 / 60);
-              var lead_days = Math.floor(lead_hours / 24);
-              lead_hours -= (lead_days * 24);
-
-              story.LeadTime = '';
-              if (lead_days > 0) {
-                story.LeadTime += lead_days;
-                if (lead_days == 1) {
-                  story.LeadTime += ' day, ';
-                } else {
-                  story.LeadTime += ' days, ';
-                }
-              }
-              story.LeadTime += lead_hours;
-              if (lead_hours == 1) {
-                story.LeadTime += ' hour';
-              } else {
-                story.LeadTime += ' hours';
-              }
+            // Record the release date so that cycle time can be calculated.
+            if (story.ReleasedDate) {
+              this.release_dates.push(story.ReleasedDate);
             }
 
             // Process the next story.
@@ -255,11 +281,34 @@
 
           // Calculate the overall statistics for the entire table.
           calculate_statistics: function(stories) {
-            this.build_table(stories);
+            // Average lead time.
+            var lead_ms = this.total_lead_ms / this.count_lead_times;
+            this.avg_lead_time = this.format_ms(lead_ms);
+
+            // Average cycle time.
+            var first_release = this.release_dates[0].getTime();
+            var last_release = this.release_dates[0].getTime();
+            for (var i = 1; i < this.release_dates.length; i += 1) {
+              var this_release = this.release_dates[i].getTime();
+              if (this_release < first_release) {
+                first_release = this_release;
+              }
+              if (this_release > last_release) {
+                last_release = this_release;
+              }
+            }
+            this.avg_cycle_time = this.format_ms((last_release - first_release) / (this.release_dates.length - 1));
+
+            // Throughput.
+            this.total_throughput = this.release_dates.length;
+            this.avg_throughput = Math.round(this.total_throughput / this.num_iterations * 100) / 100;
+
+            this.build_html(stories);
           },
 
           // Construct the HTML table to display the story data.
-          build_table: function(stories) {
+          build_html: function(stories) {
+            // The table.
             var table = '<table><thead><tr><th>' +
               Object.keys(this.columns).join('</th><th>') +
               '</th></tr></thead>';
@@ -269,10 +318,17 @@
             });
             table += '</table>';
 
+            // The table-wide statistics.
+            var stats = '<div>';
+            stats += '<strong>Average lead time:</strong> ' + this.avg_lead_time + '<br />';
+            stats += '<strong>Average cycle time:</strong> ' + this.avg_cycle_time + '<br />';
+            stats += '<strong>Throughput:</strong> ' + this.total_throughput + ' stories/quarter, ' + this.avg_throughput + ' stories/iteration<br />';
+            stats += '<br /></div>';
+
             this.removeAll();
             this.add({
               xtype: 'component',
-              html: table
+              html: stats + table
             });
             this._mask.hide();
           },
