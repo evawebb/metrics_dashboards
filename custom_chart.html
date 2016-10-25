@@ -134,7 +134,8 @@
 
           // Recursively fetch the revisions for each story.
           fetch_revisions: function(stories, index) {
-            this._mask.msg = 'Fetching revision histories...';
+            this._mask.msg = 'Fetching revision histories... (' + (index + 1);
+            this._mask.msg += ' of ' + stories.length + ')';
             this._mask.show();
 
             var story = stories[index];
@@ -259,7 +260,6 @@
             var back_flag = false;
             story.Revisions.forEach(function(r) {
               var i = indices.indexOf(r.to);
-              console.log(r.to, i);
               dates[i] = new Date(r.on);
               for (var j = i + 1; j < indices.length; j += 1) {
                 if (!back_flag && dates[j]) {
@@ -418,18 +418,42 @@
 
           // Make a scatter plot.
           build_plot: function(stories) {
-            var data = stories.map(function(s) {
-              if (s.LeadTime && s.PlanEstimate) {
-                var m = s.LeadTime.match(/((\d+) days?, )?(\d+) hour/);
-                var d = parseInt(m[2] || 0) + (parseInt(m[3] || 0) / 24.0);
-                return [s.PlanEstimate, d];
-              } else {
-                return null;
-              }
-            }).filter(function(p) { return p });
+            var data = {
+              series: [
+                {
+                  name: 'Stories',
+                  data: []
+                },
+                {
+                  name: 'Defects',
+                  data: []
+                },
+                {
+                  name: 'CV Defects',
+                  data: []
+                }
+              ]
+            };
+            var indices = ['S', 'D', 'C'];
+            stories.forEach(function(s) {
+              data.series[indices.indexOf(s._type)].data.push(s);
+            });
+            data.series.forEach(function(c) {
+              c.data = c.data.map(function(s) {
+                if (s.LeadTime && s.PlanEstimate) {
+                  var m = s.LeadTime.match(/((\d+) days?, )?(\d+) hour/);
+                  var d = parseInt(m[2] || 0) + (parseInt(m[3] || 0) / 24.0);
+                  return { x: s.PlanEstimate, y: d, name: s.Name };
+                } else {
+                  return null;
+                }
+              }).filter(function(p) { return p });
+            });
 
             var chart = this.add({
               xtype: 'rallychart',
+              loadMask: false,
+              chartData: data,
               chartConfig: {
                 chart: {
                   type: 'scatter',
@@ -438,13 +462,8 @@
                 title: { text: 'Chart title' },
                 xAxis: { title: { text: 'Estimate' } },
                 yAxis: { title: { text: 'Lead time (days)' } },
-                chartData: { series: [{ data: data }] }
-              },
-              storeConfig: {},
-              calculatorType: 'BaseCalculator',
-              calculatorConfig: {}
+              }
             });
-            console.log(chart);
           }
         });
 
