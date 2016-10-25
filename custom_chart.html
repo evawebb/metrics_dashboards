@@ -42,6 +42,7 @@
               msg: 'Please wait...'
             });
             this._mask.show();
+            this.project_oid = this.getContext().getProject().ObjectID;
             this.fetch_iterations(this.getContext().getTimeboxScope());
           },
 
@@ -141,12 +142,22 @@
             var story = stories[index];
             var that = this;
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+              fetch: ['ScheduleState', '_PreviousValues.ScheduleState', 'Project', '_PreviousValues.Project', '_ValidFrom', '_ValidTo'],
+              hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
+              filters: [
+                {
+                  property: 'ObjectID',
+                  operator: '=',
+                  value: story.get('ObjectID')
+                }
+              ],
               listeners: {
                 load: function(store, data, success) {
                   if (success) {
                     story.data.Revisions = data.filter(function(d) {
-                      return d.get('_PreviousValues.ScheduleState') === null 
-                        || d.get('_PreviousValues.ScheduleState').length > 0;
+                      return (d.get('_PreviousValues.ScheduleState') === null 
+                        || d.get('_PreviousValues.ScheduleState').length > 0)
+                        && d.get('Project') == that.project_oid;
                     }).map(function(d) {
                       return {
                         from: d.get('_PreviousValues.ScheduleState'),
@@ -162,21 +173,7 @@
                     that.get_story_data(stories, []);
                   }
                 }
-              },
-              fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom', '_ValidTo'],
-              hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
-              filters: [
-                {
-                  property: '_TypeHierarchy',
-                  operator: 'in',
-                  value: ['Defect', 'HierarchicalRequirement']
-                },
-                {
-                  property: 'ObjectID',
-                  operator: '=',
-                  value: story.get('ObjectID')
-                }
-              ]
+              }
             });
             store.load({
               scope: this
@@ -486,6 +483,6 @@
     </style>
   </head>
   <body>
-    <div>You shouldn't be able to see this! (*ﾉωﾉ)</div>
+    <div>ゆっくりしていってね！！！</div>
   </body>
 </html>
