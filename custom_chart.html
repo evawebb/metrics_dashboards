@@ -107,7 +107,7 @@
               models: ['UserStory', 'Defect'],
               fetch: this.data_keys
             }, this);
-            store.addFilter(filters[0])
+            store.addFilter(filters[0]);
             store.load({
               scope: this,
               callback: function(records, operation) {
@@ -128,35 +128,47 @@
           // Recursively fetch the revisions for each story.
           fetch_revisions: function(stories, index) {
             var story = stories[index];
-            var rh_split = story.get('RevisionHistory')._ref.split('/');
-            var rh_oid = parseInt(rh_split[rh_split.length - 1]);
-            var store = Ext.create('Rally.data.wsapi.Store', {
-              model: 'Revision',
-              sorters: [{
-                property: 'RevisionNumber',
-                direction: 'ASC'
-              }]
-            }, this);
-            var rh_filter = Ext.create('Rally.data.wsapi.Filter', {
-              property: 'RevisionHistory.ObjectID',
-              value: rh_oid
-            });
-            store.addFilter(rh_filter);
-            store.load({
-              scope: this,
-              callback: function(records, operation) {
-                if (operation.wasSuccessful()) {
-                  story.data.Revisions = records.map(function(r) {
-                    return r.data;
-                  });
-                }
+            var that = this;
+            var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+              listeners: {
+                load: function(store, data, success) {
+                  if (success) {
+                    story.data.Revisions = data.filter(function(d) {
+                      return d.get('_PreviousValues.ScheduleState') === null 
+                        || d.get('_PreviousValues.ScheduleState').length > 0;
+                    }).map(function(d) {
+                      return {
+                        from: d.get('_PreviousValues.ScheduleState'),
+                        to: d.get('ScheduleState'),
+                        on: d.get('_ValidFrom')
+                      };
+                    });
+                  }
 
-                if (index < stories.length - 1) {
-                  this.fetch_revisions(stories, index + 1);
-                } else {
-                  this.get_story_data(stories, []);
+                  if (index < stories.length - 1) {
+                    that.fetch_revisions(stories, index + 1);
+                  } else {
+                    that.get_story_data(stories, []);
+                  }
                 }
-              }
+              },
+              fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom', '_ValidTo'],
+              hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
+              filters: [
+                {
+                  property: '_TypeHierarchy',
+                  operator: 'in',
+                  value: ['Defect', 'HierarchicalRequirement']
+                },
+                {
+                  property: 'ObjectID',
+                  operator: '=',
+                  value: story.get('ObjectID')
+                }
+              ]
+            });
+            store.load({
+              scope: this
             });
           },
 
@@ -229,29 +241,21 @@
 
             // Calculate the transition dates.
             var dates = [null, null, null, null, null, null];
-            var indices = [null, 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
+            var indices = ['Idea', 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
             var back_count = 0;
             var back_flag = false;
             story.Revisions.forEach(function(r) {
-              var ms = r.Description
-                .match(/SCHEDULE STATE changed from \[(.*?)\] to \[(.*?)\]/);
-
-              if (r.Description == 'Original revision') {
-                dates[0] = r.CreationDate;
-              } else if (ms && indices.indexOf(ms[2]) >= 0) {
-                if (ms && indices.indexOf(ms[2]) >= 0) {
-                  var i = indices.indexOf(ms[2]);
-                  dates[i] = r.CreationDate;
-                  for (var j = i + 1; j < indices.length; j += 1) {
-                    if (!back_flag && dates[j]) {
-                      back_count += 1;
-                      back_flag = true;
-                    }
-                    dates[j] = null;
-                  }
-                  back_flag = false;
+              var i = indices.indexOf(r.to);
+              console.log(r.to, i);
+              dates[i] = new Date(r.on);
+              for (var j = i + 1; j < indices.length; j += 1) {
+                if (!back_flag && dates[j]) {
+                  back_count += 1;
+                  back_flag = true;
                 }
+                dates[j] = null;
               }
+              back_flag = false;
             });
             if (dates[0]) {
               story.CreatedDate = dates[0];
