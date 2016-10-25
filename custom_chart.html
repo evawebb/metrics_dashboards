@@ -30,6 +30,7 @@
             'Accepted':        { key: 'AcceptedDate',   center: true, date: true },
             'Released':        { key: 'ReleasedDate',   center: true, date: true },
             'Backtracks':      { key: 'BackCount',      center: true },
+            'Skipped':         { key: 'Skipped',        center: true },
             'Lead Time':       { key: 'LeadTime',       center: true },
             'Lead Time Ceil':  { key: 'LeadTimeCeil',   center: true },
             'Lead Time Round': { key: 'LeadTimeRound',  center: true },
@@ -52,6 +53,9 @@
           // Create a list of filters, one for each iteration in the selected
           // quarter.
           fetch_iterations: function(ts) {
+            this._mask.msg = 'Fetching iterations...';
+            this._mask.show();
+
             this.total_lead_ms = 0;
             this.count_lead_times = 0;
             this.avg_lead_time = '';
@@ -103,6 +107,9 @@
           // Recursively fetch stories for each iteration filter and add them
           // all together.
           fetch_stories: function(filters, stories) {
+            this._mask.msg = 'Fetching stories...';
+            this._mask.show();
+
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
               fetch: this.data_keys
@@ -127,6 +134,9 @@
 
           // Recursively fetch the revisions for each story.
           fetch_revisions: function(stories, index) {
+            this._mask.msg = 'Fetching revision histories...';
+            this._mask.show();
+
             var story = stories[index];
             var that = this;
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
@@ -214,6 +224,9 @@
           // Recursively reformat the data for each story. Once they're all
           // reformatted, pass the data along to the table building function.
           get_story_data: function(raw_stories, stories) {
+            this._mask.msg = 'Calculating story statistics...';
+            this._mask.show();
+
             var raw_story = raw_stories[0];
             var story = {};
             this.data_keys.forEach(function(k) {
@@ -277,6 +290,19 @@
             }
             story.BackCount = back_count;
 
+            // Check if this story skipped.
+            var stage = 0;
+            for (var i = 0; i < dates.length; i += 1) {
+              if (stage == 0 && !dates[i]) {
+                stage = 1;
+              } else if (stage == 1 && dates[i]) {
+                stage = 2;
+              }
+            }
+            if (stage == 2) {
+              story.Skipped = 'Y';
+            }
+
             // Calculate lead time.
             if (story.StartedDate && story.ReleasedDate) {
               var lead_ms = story.ReleasedDate - story.StartedDate;
@@ -304,6 +330,9 @@
 
           // Calculate the overall statistics for the entire table.
           calculate_statistics: function(stories) {
+            this._mask.msg = 'Calculating overall statistics...';
+            this._mask.show();
+
             // Average lead time.
             var lead_ms = this.total_lead_ms / this.count_lead_times;
             this.avg_lead_time = this.format_ms(lead_ms);
@@ -327,10 +356,15 @@
             this.avg_throughput = Math.round(this.total_throughput / this.num_iterations * 100) / 100;
 
             this.build_html(stories);
+            this.build_plot(stories);
+            this._mask.hide();
           },
 
           // Construct the HTML table to display the story data.
           build_html: function(stories) {
+            this._mask.msg = 'Building HTML...';
+            this._mask.show();
+
             // The table.
             var table = '<table><thead><tr><th>' +
               Object.keys(this.columns).join('</th><th>') +
@@ -353,7 +387,6 @@
               xtype: 'component',
               html: stats + table
             });
-            this._mask.hide();
           },
 
           // Given a story object, build an HTML row showing the relevant data.
@@ -381,6 +414,37 @@
             });
 
             return row;
+          },
+
+          // Make a scatter plot.
+          build_plot: function(stories) {
+            var data = stories.map(function(s) {
+              if (s.LeadTime && s.PlanEstimate) {
+                var m = s.LeadTime.match(/((\d+) days?, )?(\d+) hour/);
+                var d = parseInt(m[2] || 0) + (parseInt(m[3] || 0) / 24.0);
+                return [s.PlanEstimate, d];
+              } else {
+                return null;
+              }
+            }).filter(function(p) { return p });
+
+            var chart = this.add({
+              xtype: 'rallychart',
+              chartConfig: {
+                chart: {
+                  type: 'scatter',
+                  zoomType: 'xy'
+                },
+                title: { text: 'Chart title' },
+                xAxis: { title: { text: 'Estimate' } },
+                yAxis: { title: { text: 'Lead time (days)' } },
+                chartData: { series: [{ data: data }] }
+              },
+              storeConfig: {},
+              calculatorType: 'BaseCalculator',
+              calculatorConfig: {}
+            });
+            console.log(chart);
           }
         });
 

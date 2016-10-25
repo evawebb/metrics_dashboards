@@ -1,0 +1,3 @@
+https://rally1.rallydev.com/analytics/v2.0/service/rally/workspace/41529001/artifact/snapshot/query.js?find={%22ObjectID%22:10448843790}&fields=[%22_ValidFrom%22,%22_ValidTo%22,%22ObjectID%22,%22State%22]&start=0&pagesize=1
+
+curl -v -H "Accept: application/json" -H "Content-type: application/json" -X POST -d '{"find": { "ObjectID":66834355320 }, "fields": ["State", "ObjectID"], "hydrate": ["State"], "compress": true}' https://rally1.rallydev.com/analytics/v2.0/service/rally/workspace/41529001/artifact/snapshot/query.js
