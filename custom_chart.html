@@ -172,11 +172,9 @@
                 }
               }
             });
-            console.log('a');
             store.load({
               scope: this
             });
-            console.log('b');
           },
 
           // Given a millisecond count, format it as 'X days, Y hours'.
@@ -377,8 +375,6 @@
 
           // Construct the HTML table to display the story data.
           build_html: function(stories) {
-            this._mask.msg = 'Building HTML...';
-            this._mask.show();
             var that = this;
 
             // The table.
@@ -492,17 +488,63 @@
 
           // Build a cumulative flow diagram.
           build_flow_dia: function(stories) {
-            this._mask.msg = 'Building cumulative flow...';
-            this._mask.show();
-            
-            console.log(stories.filter(function(s) {
-              return s.CreatedDate;
-            }).map(function(s) {
-              var d = s.CreatedDate;
-              return '' + d.getFullYear()
-                + '-' + ('00' + d.getMonth()).slice(-2)
-                + '-' + ('00' + d.getDate()).slice(-2);
-            })).sort();
+            var labels = [
+              'CreatedDate',
+              'DefinedDate',
+              'StartedDate',
+              'CompletedDate',
+              'AcceptedDate',
+              'ReleasedDate'
+            ];
+
+            var totals = {};
+            var start = {};
+            var now = new Date();
+            if (new Date(this.end_date) < now) {
+              now = new Date(this.end_date);
+            }
+            for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+              totals[d.toDateString()] = {};
+            }
+            labels.forEach(function(dt) {
+              Object.keys(totals).forEach(function(date) {
+                totals[date][dt] = 0;
+              });
+              start[dt] = 0;
+            });
+
+            stories.forEach(function(s) {
+              prev_state = null;
+
+              labels.forEach(function(dt) {
+                if (s[dt]) {
+                  if (totals.hasOwnProperty(s[dt].toDateString())) {
+                    totals[s[dt].toDateString()][dt] += 1;
+                    if (prev_state) {
+                      totals[s[dt].toDateString()][prev_state] -= 1;
+                    }
+                  } else {
+                    start[dt] += 1;
+                    if (prev_state) {
+                      start[prev_state] -= 1;
+                    }
+                  }
+
+                  prev_state = dt;
+                }
+              });
+            });
+
+            var prev = start;
+            for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+              var df = d.toDateString();
+              labels.forEach(function(dt) {
+                totals[df][dt] += prev[dt];
+              });
+              prev = totals[df];
+            }
+
+            console.log(totals);
           }
         });
 
