@@ -172,9 +172,11 @@
                 }
               }
             });
+            console.log('a');
             store.load({
               scope: this
             });
+            console.log('b');
           },
 
           // Given a millisecond count, format it as 'X days, Y hours'.
@@ -369,6 +371,7 @@
 
             this.build_html(stories);
             this.build_plot(stories);
+            this.build_flow_dia(stories);
             this._mask.hide();
           },
 
@@ -485,6 +488,21 @@
                 yAxis: { title: { text: 'Lead time (days)' } },
               }
             });
+          },
+
+          // Build a cumulative flow diagram.
+          build_flow_dia: function(stories) {
+            this._mask.msg = 'Building cumulative flow...';
+            this._mask.show();
+            
+            console.log(stories.filter(function(s) {
+              return s.CreatedDate;
+            }).map(function(s) {
+              var d = s.CreatedDate;
+              return '' + d.getFullYear()
+                + '-' + ('00' + d.getMonth()).slice(-2)
+                + '-' + ('00' + d.getDate()).slice(-2);
+            })).sort();
           }
         });
 
