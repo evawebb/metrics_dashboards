@@ -57,26 +57,23 @@
             this._mask.msg = 'Fetching iterations...';
             this._mask.show();
 
-            this.total_lead_ms = 0;
-            this.count_lead_times = 0;
-            this.avg_lead_time = '';
-            this.release_dates = [];
-            this.avg_cycle_time = '';
-            this.num_iterations = 0;
-            this.total_throughput = 0;
-            this.avg_throughput = 0;
+            this.total_stats = {
+              C: { name: 'CV Defects' },
+              D: { name: 'Defects' },
+              S: { name: 'Stories' }
+            };
 
-            var start = ts.record.raw.ReleaseStartDate;
-            var end = ts.record.raw.ReleaseDate;
+            this.start_date = ts.record.raw.ReleaseStartDate;
+            this.end_date = ts.record.raw.ReleaseDate;
             var start_filter = Ext.create('Rally.data.wsapi.Filter', {
               property: 'StartDate',
               operator: '>=',
-              value: start
+              value: this.start_date
             });
             var end_filter = Ext.create('Rally.data.wsapi.Filter', {
               property: 'StartDate',
               operator: '<',
-              value: end
+              value: this.end_date
             });
 
             var store = Ext.create('Rally.data.wsapi.Store', {
@@ -303,16 +300,9 @@
             // Calculate lead time.
             if (story.StartedDate && story.ReleasedDate) {
               var lead_ms = story.ReleasedDate - story.StartedDate;
-              this.total_lead_ms += lead_ms;
-              this.count_lead_times += 1;
               story.LeadTime = this.format_ms(lead_ms);
               story.LeadTimeCeil = this.format_ms(lead_ms, 'ceil');
               story.LeadTimeRound = this.format_ms(lead_ms, 'round');
-            }
-
-            // Record the release date so that cycle time can be calculated.
-            if (story.ReleasedDate) {
-              this.release_dates.push(story.ReleasedDate);
             }
 
             // Process the next story.
@@ -329,28 +319,53 @@
           calculate_statistics: function(stories) {
             this._mask.msg = 'Calculating overall statistics...';
             this._mask.show();
+            var that = this;
 
-            // Average lead time.
-            var lead_ms = this.total_lead_ms / this.count_lead_times;
-            this.avg_lead_time = this.format_ms(lead_ms);
-
-            // Average cycle time.
-            var first_release = this.release_dates[0].getTime();
-            var last_release = this.release_dates[0].getTime();
-            for (var i = 1; i < this.release_dates.length; i += 1) {
-              var this_release = this.release_dates[i].getTime();
-              if (this_release < first_release) {
-                first_release = this_release;
-              }
-              if (this_release > last_release) {
-                last_release = this_release;
-              }
-            }
-            this.avg_cycle_time = this.format_ms((last_release - first_release) / (this.release_dates.length - 1));
+            // Filter out CV Defects that were not resolved.
+            var filt_stories = stories.filter(function(s) {
+              return !(s._type == 'C' && !s.Resolution.match(/[cC]hange$/));
+            });
 
             // Throughput.
-            this.total_throughput = this.release_dates.length;
-            this.avg_throughput = Math.round(this.total_throughput / this.num_iterations * 100) / 100;
+            Object.keys(this.total_stats).forEach(function(t) {
+              that.total_stats[t].throughput_r = filt_stories.filter(function(s) {
+                return (s._type == t && s.ReleasedDate);
+              }).length;
+              that.total_stats[t].throughput_a = filt_stories.filter(function(s) {
+                return (s._type == t && (s.AcceptedDate || s.ReleasedDate));
+              }).length;
+            });
+
+            // Weekly released.
+            var weekdays = 0;
+            var now = new Date();
+            if (new Date(this.end_date) < now) {
+              now = new Date(this.end_date);
+            }
+            for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+              if (d.getDay() != 0 && d.getDay() != 6) {
+                weekdays += 1;
+              }
+            }
+            Object.keys(this.total_stats).forEach(function(t) {
+              that.total_stats[t].weekly_r = that.total_stats[t].throughput_r / (weekdays / 5.0);
+            });
+
+            // Average cycle time.
+            Object.keys(this.total_stats).forEach(function(t) {
+              that.total_stats[t].cycle_time = 0;
+              that.total_stats[t].cycle_count = 0;
+            });
+            filt_stories.forEach(function(s) {
+              if (s.StartedDate && s.ReleasedDate) {
+                that.total_stats[s._type].cycle_time += 
+                  (s.ReleasedDate - s.StartedDate);
+                that.total_stats[s._type].cycle_count += 1;
+              }
+            });
+            Object.keys(this.total_stats).forEach(function(t) {
+              that.total_stats[t].cycle_time /= that.total_stats[t].cycle_count;
+            });
 
             this.build_html(stories);
             this.build_plot(stories);
@@ -361,28 +376,37 @@
           build_html: function(stories) {
             this._mask.msg = 'Building HTML...';
             this._mask.show();
+            var that = this;
 
             // The table.
             var table = '<table><thead><tr><th>' +
               Object.keys(this.columns).join('</th><th>') +
               '</th></tr></thead>';
-            var that = this;
             stories.forEach(function(story) {
               table += that.build_table_row(story);
             });
             table += '</table>';
 
             // The table-wide statistics.
-            var stats = '<div>';
-            stats += '<strong>Average lead time:</strong> ' + this.avg_lead_time + '<br />';
-            stats += '<strong>Average cycle time:</strong> ' + this.avg_cycle_time + '<br />';
-            stats += '<strong>Throughput:</strong> ' + this.total_throughput + ' stories/quarter, ' + this.avg_throughput + ' stories/iteration<br />';
-            stats += '<br /></div>';
+            var stats = '<table><thead><tr><th>Type</th>' +
+              '<th>Accepted Throughput</th><th>Released Throughput</th>' +
+              '<th>Weekly Released Avg.</th><th>Release Cycle Time Avg.</th>' +
+              '</tr></thead>';
+            Object.keys(this.total_stats).forEach(function(t) {
+              var ts = that.total_stats[t];
+              stats += '<tr><td class="center">' + ts.name + '</td>';
+              stats += '<td class="center">' + ts.throughput_a.toLocaleString() + ' stories</td>';
+              stats += '<td class="center">' + ts.throughput_r.toLocaleString() + ' stories</td>';
+              stats += '<td class="center">' + ts.weekly_r.toLocaleString() + ' stories</td>';
+              stats += '<td class="center">' + that.format_ms(ts.cycle_time) + '</td>';
+              stats += '</tr>';
+            });
+            stats += '</table>';
 
             this.removeAll();
             this.add({
               xtype: 'component',
-              html: stats + table
+              html: stats + '<br />' + table
             });
           },
 
@@ -483,6 +507,6 @@
     </style>
   </head>
   <body>
-    <div>ゆっくりしていってね！！！</div>
+    <div>ø</div>
   </body>
 </html>
