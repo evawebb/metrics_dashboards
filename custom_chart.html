@@ -479,7 +479,7 @@
                   type: 'scatter',
                   zoomType: 'xy'
                 },
-                title: { text: 'Chart title' },
+                title: { text: 'Estimate vs. Lead time' },
                 xAxis: { title: { text: 'Estimate' } },
                 yAxis: { title: { text: 'Lead time (days)' } },
               }
@@ -489,8 +489,8 @@
           // Build a cumulative flow diagram.
           build_flow_dia: function(stories) {
             var labels = [
-              'CreatedDate',
-              'DefinedDate',
+              // 'CreatedDate',
+              // 'DefinedDate',
               'StartedDate',
               'CompletedDate',
               'AcceptedDate',
@@ -536,15 +536,54 @@
             });
 
             var prev = start;
+            var categories = [];
+            var mapped_series = {};
+            labels.forEach(function(dt) {
+              mapped_series[dt] = [];
+            });
             for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
               var df = d.toDateString();
+              categories.push(df);
               labels.forEach(function(dt) {
                 totals[df][dt] += prev[dt];
+                mapped_series[dt].push(totals[df][dt]);
               });
               prev = totals[df];
             }
 
-            console.log(totals);
+            var series = [];
+            labels.forEach(function(dt) {
+              series.push({
+                name: dt.slice(0, -4),
+                data: mapped_series[dt]
+              });
+            });
+
+            var chart = this.add({
+              xtype: 'rallychart',
+              loadMask: false,
+              chartData: { series: series, categories: categories },
+              chartConfig: {
+                chart: {
+                  type: 'area'
+                },
+                title: { text: 'Release Cumulative Flow' },
+                xAxis: { 
+                  title: { enabled: false },
+                  tickInterval: 7
+                },
+                yAxis: { title: { enabled: false } },
+                plotOptions: {
+                  area: {
+                    stacking: 'normal',
+                    lineColor: '#666666',
+                    lineWidth: 1,
+                    tooltip: { split: true, valueSuffix: ' stories' },
+                    marker: { enabled: false }
+                  }
+                }
+              }
+            });
           }
         });
 
