@@ -299,10 +299,17 @@
 
             // Calculate lead time.
             if (story.StartedDate && story.ReleasedDate) {
-              var lead_ms = story.ReleasedDate - story.StartedDate;
-              story.LeadTime = this.format_ms(lead_ms);
-              story.LeadTimeCeil = this.format_ms(lead_ms, 'ceil');
-              story.LeadTimeRound = this.format_ms(lead_ms, 'round');
+              story.LeadTimeMs = story.ReleasedDate - story.StartedDate;
+              for (var d = new Date(story.StartedDate); d <= story.ReleasedDate;
+                   d.setDate(d.getDate() + 1)) {
+                if (d.getDay() == 0 || d.getDay() == 6) {
+                  story.LeadTimeMs -= 24 * 60 * 60 * 1000;
+                }
+              }
+
+              story.LeadTime = this.format_ms(story.LeadTimeMs);
+              story.LeadTimeCeil = this.format_ms(story.LeadTimeMs, 'ceil');
+              story.LeadTimeRound = this.format_ms(story.LeadTimeMs, 'round');
             }
 
             // Process the next story.
@@ -468,9 +475,8 @@
             });
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
-                if (s.LeadTime && s.PlanEstimate) {
-                  var m = s.LeadTime.match(/((\d+) days?, )?(\d+) hour/);
-                  var d = parseInt(m[2] || 0) + (parseInt(m[3] || 0) / 24.0);
+                if (s.LeadTimeMs && s.PlanEstimate) {
+                  var d = s.LeadTimeMs / 1000 / 60 / 60 / 24;
                   return { x: s.PlanEstimate, y: d, name: s.Name };
                 } else {
                   return null;
