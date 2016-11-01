@@ -70,22 +70,23 @@
 
             this.start_date = ts.record.raw.ReleaseStartDate;
             this.end_date = ts.record.raw.ReleaseDate;
-            var start_filter = Ext.create('Rally.data.wsapi.Filter', {
-              property: 'StartDate',
-              operator: '>=',
-              value: this.start_date
-            });
-            var end_filter = Ext.create('Rally.data.wsapi.Filter', {
-              property: 'StartDate',
-              operator: '<',
-              value: this.end_date
-            });
 
             var store = Ext.create('Rally.data.wsapi.Store', {
               model: 'Iteration',
-              fetch: ['Name', 'StartDate']
+              fetch: ['Name', 'StartDate'],
+              filters: [
+                {
+                  property: 'StartDate',
+                  operator: '>=',
+                  value: this.start_date
+                },
+                {
+                  property: 'StartDate',
+                  operator: '<',
+                  value: this.end_date
+                }
+              ]
             }, this);
-            store.addFilter([start_filter, end_filter], false);
             store.load({
               scope: this,
               callback: function(records, operation) {
@@ -94,14 +95,11 @@
                     return r.get('StartDate').getTime() < Date.now();
                   }).length;
 
-                  var filters = records.map(function(r) {
-                    return Ext.create('Rally.data.wsapi.Filter', {
-                      property: 'Iteration.Name',
-                      value: r.get('Name')
-                    });
+                  var iterations = records.map(function(r) {
+                    return r.get('Name');
                   });
 
-                  this.fetch_stories(filters, []);
+                  this.fetch_stories(iterations, []);
                 }
               }
             });
@@ -109,21 +107,26 @@
 
           // Recursively fetch stories for each iteration filter and add them
           // all together.
-          fetch_stories: function(filters, stories) {
+          fetch_stories: function(iterations, stories) {
             this._mask.msg = 'Fetching stories...';
             this._mask.show();
 
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
-              fetch: this.data_keys
+              fetch: this.data_keys,
+              filters: [
+                {
+                  property: 'Iteration.Name',
+                  value: iterations[0]
+                }
+              ]
             }, this);
-            store.addFilter(filters[0]);
             store.load({
               scope: this,
               callback: function(records, operation) {
-                filters.shift();
-                if (filters.length > 0) {
-                  this.fetch_stories(filters,
+                iterations.shift();
+                if (iterations.length > 0) {
+                  this.fetch_stories(iterations,
                     operation.wasSuccessful() ?
                       stories.concat(records) :
                       stories
