@@ -364,7 +364,9 @@
               }
             });
             Object.keys(this.total_stats).forEach(function(t) {
-              that.total_stats[t].cycle_time /= that.total_stats[t].cycle_count;
+              if (that.total_stats[t].cycle_count > 0) {
+                that.total_stats[t].cycle_time /= that.total_stats[t].cycle_count;
+              }
             });
 
             this.build_html(stories);
@@ -388,15 +390,21 @@
 
             // The table-wide statistics.
             var stats = '<table><thead><tr><th>Type</th>' +
-              '<th>Accepted Throughput</th><th>Released Throughput</th>' +
-              '<th>Weekly Released Avg.</th><th>Release Cycle Time Avg.</th>' +
+              '<th title="Number of stories or defects accepted in this quarter.">Accepted Throughput</th>' +
+              '<th title="Number of stories or defects released in this quarter.">Released Throughput</th>' +
+              '<th title="Average number of stories or defects released each week this quarter.">Weekly Released Avg.</th>' +
+              '<th title="Average cycle time (from Started to Released) for stories or defects this quarter.">Release Cycle Time Avg.</th>' +
               '</tr></thead>';
             Object.keys(this.total_stats).forEach(function(t) {
               var ts = that.total_stats[t];
+              var label = 'defects';
+              if (t == 'S') {
+                label = 'stories';
+              }
               stats += '<tr><td class="center">' + ts.name + '</td>';
-              stats += '<td class="center">' + ts.throughput_a.toLocaleString() + ' stories</td>';
-              stats += '<td class="center">' + ts.throughput_r.toLocaleString() + ' stories</td>';
-              stats += '<td class="center">' + ts.weekly_r.toLocaleString() + ' stories</td>';
+              stats += '<td class="center">' + ts.throughput_a.toLocaleString() + ' ' + label + '</td>';
+              stats += '<td class="center">' + ts.throughput_r.toLocaleString() + ' ' + label + '</td>';
+              stats += '<td class="center">' + ts.weekly_r.toLocaleString() + ' ' + label + '</td>';
               stats += '<td class="center">' + that.format_ms(ts.cycle_time) + '</td>';
               stats += '</tr>';
             });
