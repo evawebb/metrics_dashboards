@@ -40,6 +40,7 @@
             'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
           ],
+          complete_dates: true,
 
           launch: function() {
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -136,7 +137,7 @@
 
           // Recursively fetch the revisions for each story.
           fetch_revisions: function(stories, index) {
-            this._mask.msg = 'Fetching revision histories... (' + (index + 1);
+            this._mask.msg = 'Fetching story histories... (' + (index + 1);
             this._mask.msg += ' of ' + stories.length + ')';
             this._mask.show();
 
@@ -268,23 +269,56 @@
               }
               back_flag = false;
             });
+
+            // Fill in missing dates.
+            var filled = [false, false, false, false, false, false];
+            if (this.complete_dates && (dates[0] || dates[1]) && dates[5]) {
+              for (var i = 4; i >= 3; i -= 1) {
+                if (!dates[i]) {
+                  dates[i] = dates[i + 1];
+                  filled[i] = true;
+                }
+              }
+
+              if (dates[0]) {
+                for (var i = 1; i <= 2; i += 1) {
+                  if (!dates[i]) {
+                    dates[i] = dates[i - 1];
+                    filled[i] = true;
+                  }
+                }
+              } else {
+                if (!dates[2]) {
+                  dates[2] = dates[1];
+                  filled[2] = true;
+                }
+              }
+            }
+
+            // Assign the transition dates to the story.
             if (dates[0]) {
               story.CreatedDate = dates[0];
+              story.CreatedDateFilled = filled[0];
             }
             if (dates[1]) {
               story.DefinedDate = dates[1];
+              story.DefinedDateFilled = filled[1];
             }
             if (dates[2]) {
               story.StartedDate = dates[2];
+              story.StartedDateFilled = filled[2];
             }
             if (dates[3]) {
               story.CompletedDate = dates[3];
+              story.CompletedDateFilled = filled[3];
             }
             if (dates[4]) {
               story.AcceptedDate = dates[4];
+              story.AcceptedDateFilled = filled[4];
             }
             if (dates[5]) {
               story.ReleasedDate = dates[5];
+              story.ReleasedDateFilled = filled[5];
             }
             story.BackCount = back_count;
 
@@ -437,14 +471,18 @@
             Object.keys(this.columns).forEach(function(col) {
               var datum = data[that.columns[col].key];
               var center = that.columns[col].center;
+              var filled = false;
               if (!datum) {
                 datum = '';
               } else if (that.columns[col].date) {
+                filled = data[that.columns[col].key + 'Filled'];
                 datum = datum.toDateString();
               }
 
-              row += ('<td ' +
-                (center ? 'class = "center" ' : '') +
+              row += ('<td class="' +
+                (center ? 'center ' : '') +
+                (filled ? 'filled ' : '') +
+                '" ' +
                 ('bgcolor="' + data.color + '" ') +
                 '>' +
                 datum +
@@ -657,6 +695,11 @@
 
       .center {
         text-align: center;
+      }
+
+      .filled {
+        font-style: italic;
+        color: #808080;
       }
     </style>
   </head>
