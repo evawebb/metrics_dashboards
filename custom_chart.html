@@ -41,6 +41,7 @@
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
           ],
           complete_dates: true,
+          lead_time_threshold: 15,
 
           launch: function() {
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -538,6 +539,7 @@
             stories.forEach(function(s) {
               data.series[indices.indexOf(s._type)].data.push(s);
             });
+            var omitted = 0;
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
                 if (s.LeadTimeMs && s.ReleasedDate) {
@@ -559,7 +561,12 @@
                 } else {
                   return null;
                 }
-              }).filter(function(p) { return p });
+              }).filter(function(p) { 
+                if (p && p.y >= that.lead_time_threshold) {
+                  omitted += 1;
+                }
+                return p && p.y < that.lead_time_threshold;
+              });
             });
 
             var chart = this.add({
@@ -572,9 +579,9 @@
                   zoomType: 'xy'
                 },
                 title: { text: 'Lead Time This Quarter' },
+                subtitle: { text: '<em>' + omitted + ' stories and defects with lead times longer than ' + this.lead_time_threshold + ' days have been omitted.</em>' },
                 xAxis: { 
                   title: { text: 'Release date' },
-                  //tickInterval: 2 * 24 * 60 * 60 * 1000,
                   labels: { 
                     formatter: function() {
                       return new Date(this.value).toDateString();
