@@ -56,6 +56,15 @@
             this.fetch_iterations(ts);
           },
 
+          haltEarly: function(msg) {
+            this._mask.hide();
+            this.removeAll();
+            this.add({
+              xtype: 'component',
+              html: 'Error: ' + msg
+            });
+          },
+
           // Create a list of filters, one for each iteration in the selected
           // quarter.
           fetch_iterations: function(ts) {
@@ -99,7 +108,11 @@
                     return r.get('Name');
                   });
 
-                  this.fetch_stories(iterations, []);
+                  if (iterations.length > 0) {
+                    this.fetch_stories(iterations, []);
+                  } else {
+                    this.haltEarly('No iterations found.');
+                  }
                 }
               }
             });
@@ -132,7 +145,11 @@
                       stories
                   );
                 } else {
-                  this.fetch_histories(stories);
+                  if (stories.length > 0) {
+                    this.fetch_histories(stories);
+                  } else {
+                    this.haltEarly('No stories found.');
+                  }
                 }
               }
             });
