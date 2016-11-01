@@ -129,19 +129,23 @@
                       stories
                   );
                 } else {
-                  this.fetch_revisions(stories, 0);
+                  this.fetch_histories(stories);
                 }
               }
             });
           },
 
-          // Recursively fetch the revisions for each story.
-          fetch_revisions: function(stories, index) {
-            this._mask.msg = 'Fetching story histories... (' + (index + 1);
-            this._mask.msg += ' of ' + stories.length + ')';
+          // Fetch the revisions for all the stories.
+          fetch_histories: function(stories) {
+            this._mask.msg = 'Fetching story histories...';
             this._mask.show();
 
-            var story = stories[index];
+            var hashed_stories = {};
+            stories.forEach(function(s) {
+              s.data.Revisions = [];
+              hashed_stories[s.get('ObjectID')] = s;
+            });
+
             var that = this;
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
               fetch: ['ScheduleState', '_PreviousValues.ScheduleState', 'Project', '_PreviousValues.Project', '_ValidFrom', '_ValidTo'],
@@ -149,37 +153,35 @@
               filters: [
                 {
                   property: 'ObjectID',
-                  operator: '=',
-                  value: story.get('ObjectID')
+                  operator: 'in',
+                  value: stories.map(function(s) {
+                    return s.get('ObjectID');
+                  })
                 }
               ],
               listeners: {
                 load: function(store, data, success) {
                   if (success) {
-                    story.data.Revisions = data.filter(function(d) {
-                      return (d.get('_PreviousValues.ScheduleState') === null 
-                        || d.get('_PreviousValues.ScheduleState').length > 0)
+                    data.filter(function(d) {
+                      return (
+                          d.get('_PreviousValues.ScheduleState') == null
+                          || d.get('_PreviousValues.ScheduleState').length > 0
+                        )
                         && d.get('Project') == that.project_oid;
-                    }).map(function(d) {
-                      return {
+                    }).forEach(function(d) {
+                      hashed_stories[d.get('ObjectID')].data.Revisions.push({
                         from: d.get('_PreviousValues.ScheduleState'),
                         to: d.get('ScheduleState'),
                         on: d.get('_ValidFrom')
-                      };
+                      });
                     });
                   }
 
-                  if (index < stories.length - 1) {
-                    that.fetch_revisions(stories, index + 1);
-                  } else {
-                    that.get_story_data(stories, []);
-                  }
+                  that.get_story_data(stories, []);
                 }
               }
             });
-            store.load({
-              scope: this
-            });
+            store.load({ scope: this });
           },
 
           // Given a millisecond count, format it as 'X days, Y hours'.
