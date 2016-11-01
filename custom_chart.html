@@ -36,6 +36,10 @@
             'Lead Time Round': { key: 'LeadTimeRound',  center: true },
             'Resolution':      { key: 'Resolution',     center: false }
           },
+          months: [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ],
 
           launch: function() {
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -453,6 +457,7 @@
 
           // Make a scatter plot.
           build_plot: function(stories) {
+            var that = this;
             var data = {
               series: [
                 {
@@ -475,9 +480,22 @@
             });
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
-                if (s.LeadTimeMs && s.PlanEstimate) {
+                if (s.LeadTimeMs && s.ReleasedDate) {
                   var d = s.LeadTimeMs / 1000 / 60 / 60 / 24;
-                  return { x: s.PlanEstimate, y: d, name: s.Name };
+                  var n = s.Name;
+                  if (n.length > 40) {
+                    n = n.substring(0, 37) + '...';
+                  }
+                  return { 
+                    x: s.ReleasedDate, 
+                    y: d, 
+                    z: s.PlanEstimate || 0,
+                    name: n, 
+                    fid: s.FormattedID,
+                    year: s.ReleasedDate.getFullYear(),
+                    month: that.months[s.ReleasedDate.getMonth()],
+                    day: s.ReleasedDate.getDate()
+                  };
                 } else {
                   return null;
                 }
@@ -490,12 +508,35 @@
               chartData: data,
               chartConfig: {
                 chart: {
-                  type: 'scatter',
+                  type: 'bubble',
                   zoomType: 'xy'
                 },
-                title: { text: 'Estimate vs. Lead time' },
-                xAxis: { title: { text: 'Estimate' } },
-                yAxis: { title: { text: 'Lead time (days)' } },
+                title: { text: 'Lead Time This Quarter' },
+                xAxis: { 
+                  title: { text: 'Release date' },
+                  //tickInterval: 2 * 24 * 60 * 60 * 1000,
+                  labels: { 
+                    formatter: function() {
+                      return new Date(this.value).toDateString();
+                    },
+                  }
+                },
+                yAxis: { 
+                  title: { text: 'Lead time (days)' },
+                  min: 0
+                },
+                tooltip: {
+                  pointFormat: 
+                    '<b>{point.fid}</b>: {point.name}<br />' +
+                    'Released on {point.day} {point.month} {point.year}<br />' +
+                    'Lead time: {point.y:.2f} days<br />' +
+                    'Estimated at {point.z} points'
+                },
+                plotOptions: {
+                  bubble: {
+                    sizeBy: 'width'
+                  }
+                }
               }
             });
           },
