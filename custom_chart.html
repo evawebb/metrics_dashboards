@@ -52,9 +52,43 @@
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
           ],
           complete_dates: true,
+          cycle_time_start_state: 'Started',
+          cycle_time_end_state: 'Released',
           cycle_time_threshold: 15,
 
+          getUserSettingsFields: function() {
+            return [
+              {
+                name: 'Cycle Time Start State',
+                xtype: 'rallytextfield'
+              },
+              {
+                name: 'Cycle Time End State',
+                xtype: 'rallytextfield'
+              }
+            ];
+          },
+
+          onSettingsUpdate: function(settings) {
+            if (
+              settings['Cycle Time Start State'] != this.cycle_time_start_state
+              || settings['Cycle Time End State'] != this.cycle_time_end_state
+            ) {
+              this.cycle_time_start_state = settings['Cycle Time Start State'];
+              this.cycle_time_end_state = settings['Cycle Time End State'];
+              this._mask.show();
+              this.fetch_iterations(this.getContext().getTimeboxScope());
+            }
+          },
+
           launch: function() {
+            if (this.getSettings()['Cycle Time Start State']) {
+              this.cycle_time_start_state = this.getSettings()['Cycle Time Start State'];
+            }
+            if (this.getSettings()['Cycle Time End State']) {
+              this.cycle_time_end_state = this.getSettings()['Cycle Time End State'];
+            }
+
             this._mask = new Ext.LoadMask(Ext.getBody(), {
               msg: 'Please wait...'
             });
@@ -335,10 +369,11 @@
             }
 
             // Calculate cycle time.
-            if (story.StartedDate && story.ReleasedDate) {
-              story.CycleTimeMs = story.ReleasedDate - story.StartedDate;
-              for (var d = new Date(story.StartedDate); d <= story.ReleasedDate;
-                   d.setDate(d.getDate() + 1)) {
+            var cst = story[this.cycle_time_start_state + 'Date'];
+            var cet = story[this.cycle_time_end_state + 'Date'];
+            if (cst && cet) {
+              story.CycleTimeMs = cet - cst;
+              for (var d = new Date(cst); d <= cet; d.setDate(d.getDate() + 1)) {
                 if (d.getDay() == 0 || d.getDay() == 6) {
                   story.CycleTimeMs -= 24 * 60 * 60 * 1000;
                 }
@@ -410,10 +445,11 @@
               total_stats[t].cycle_time = 0;
               total_stats[t].cycle_count = 0;
             });
+            var cst = this.cycle_time_start_state + 'Date';
+            var cet = this.cycle_time_end_state + 'Date';
             filt_stories.forEach(function(s) {
-              if (s.StartedDate && s.ReleasedDate) {
-                total_stats[s._type].cycle_time += 
-                  (s.ReleasedDate - s.StartedDate);
+              if (s[cst] && s[cet]) {
+                total_stats[s._type].cycle_time += (s[cet] - s[cst]);
                 total_stats[s._type].cycle_count += 1;
               }
             });
@@ -424,6 +460,7 @@
             });
 
             this.removeAll();
+            this.build_settings_link();
             this.build_stats_table(total_stats);
             this.build_table(stories);
             this.build_plot(stories);
@@ -448,17 +485,27 @@
             }
           },
 
+          // Add a link that opens the app settings.
+          build_settings_link: function() {
+            this.add({
+              xtype: 'component',
+              html: '<a href="javascript:;" onClick="' +
+                    'Rally.getApp().showSettings()' +
+                    '">Modify app settings</a><br />'
+            });
+          },
+
           // Construct the HTML table to display the calculated
           // flow data.
           build_stats_table: function(total_stats) {
             var that = this;
 
             // The table-wide statistics.
-            var stats = '<table><thead><tr><th>Type</th>' +
+            var stats = '<br /><table><thead><tr><th>Type</th>' +
               '<th title="Number of stories or defects accepted in this quarter.">Accepted Throughput</th>' +
               '<th title="Number of stories or defects released in this quarter.">Released Throughput</th>' +
               '<th title="Average number of stories or defects released each week this quarter.">Weekly Released Avg.</th>' +
-              '<th title="Average cycle time (from Started to Released) for stories or defects this quarter.">Release Cycle Time Avg.</th>' +
+              '<th title="Average cycle time (from ' + this.cycle_time_start_state + ' to ' + this.cycle_time_end_state + ') for stories or defects this quarter.">Cycle Time Avg.</th>' +
               '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date, and CV defects that were administratively resolved.">Skipped</th>' +
               '</tr></thead>';
             Object.keys(total_stats).forEach(function(t) {
@@ -558,21 +605,22 @@
             var omitted = 0;
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
-                if (s.CycleTimeMs && s.ReleasedDate) {
+                var cet = s[that.cycle_time_end_state + 'Date'];
+                if (s.CycleTimeMs && cet) {
                   var d = s.CycleTimeMs / 1000 / 60 / 60 / 24;
                   var n = s.Name;
                   if (n.length > 40) {
                     n = n.substring(0, 37) + '...';
                   }
                   return { 
-                    x: s.ReleasedDate, 
+                    x: cet, 
                     y: d, 
                     z: s.PlanEstimate || 0,
                     name: n, 
                     fid: s.FormattedID,
-                    year: s.ReleasedDate.getFullYear(),
-                    month: that.months[s.ReleasedDate.getMonth()],
-                    day: s.ReleasedDate.getDate()
+                    year: cet.getFullYear(),
+                    month: that.months[cet.getMonth()],
+                    day: cet.getDate()
                   };
                 } else {
                   return null;
@@ -597,7 +645,7 @@
                 title: { text: 'Cycle Time This Quarter' },
                 subtitle: { text: '<em>' + omitted + ' artifact' + (omitted == 1 ? '' : 's') + ' with cycle times longer than ' + this.cycle_time_threshold + ' days have been omitted.</em>' },
                 xAxis: { 
-                  title: { text: 'Release date' },
+                  title: { text: this.cycle_time_end_state + ' date' },
                   labels: { 
                     formatter: function() {
                       return new Date(this.value).toDateString();
@@ -611,7 +659,7 @@
                 tooltip: {
                   pointFormat: 
                     '<b>{point.fid}</b>: {point.name}<br />' +
-                    'Released on {point.day} {point.month} {point.year}<br />' +
+                    this.cycle_time_end_state + ' on {point.day} {point.month} {point.year}<br />' +
                     'Cycle time: {point.y:.2f} days<br />' +
                     'Estimated at {point.z} points'
                 },
