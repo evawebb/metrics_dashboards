@@ -4,6 +4,18 @@
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
+      function toggle_big_table() {
+        var t = document.getElementById("big_table");
+        var l = document.getElementById("toggle_link");
+        if (t.style.display == "inline") {
+          t.style.display = "none";
+          l.innerHTML = "Show all stories";
+        } else {
+          t.style.display = "inline";
+          l.innerHTML = "Hide all stories";
+        }
+      }
+
       Rally.onReady(function () {
         Ext.define('ZzacksApp', {
           extend: 'Rally.app.TimeboxScopedApp',
@@ -16,32 +28,31 @@
             'Resolution',
             'Tags',
             'RevisionHistory',
-            'Revisions'
+            'Revisions',
+            'CreationDate'
           ],
           columns: {
-            'FormattedID':     { key: 'FormattedID',    center: true },
-            'Type':            { key: '_type',          center: true },
-            'Name':            { key: 'Name',           center: false },
-            'Estimate':        { key: 'PlanEstimate',   center: true },
-            'Created':         { key: 'CreatedDate',    center: true, date: true },
-            'Defined':         { key: 'DefinedDate',    center: true, date: true },
-            'Started':         { key: 'StartedDate',    center: true, date: true },
-            'Completed':       { key: 'CompletedDate',  center: true, date: true },
-            'Accepted':        { key: 'AcceptedDate',   center: true, date: true },
-            'Released':        { key: 'ReleasedDate',   center: true, date: true },
-            'Backtracks':      { key: 'BackCount',      center: true },
-            'Skipped':         { key: 'Skipped',        center: true },
-            'Lead Time':       { key: 'LeadTime',       center: true },
-            'Lead Time Ceil':  { key: 'LeadTimeCeil',   center: true },
-            'Lead Time Round': { key: 'LeadTimeRound',  center: true },
-            'Resolution':      { key: 'Resolution',     center: false }
+            'FormattedID':      { key: 'FormattedID',    center: true },
+            'Type':             { key: '_type',          center: true },
+            'Name':             { key: 'Name',           center: false },
+            'Estimate':         { key: 'PlanEstimate',   center: true },
+            'Created':          { key: 'CreatedDate',    center: true, date: true },
+            'Defined':          { key: 'DefinedDate',    center: true, date: true },
+            'Started':          { key: 'StartedDate',    center: true, date: true },
+            'Completed':        { key: 'CompletedDate',  center: true, date: true },
+            'Accepted':         { key: 'AcceptedDate',   center: true, date: true },
+            'Released':         { key: 'ReleasedDate',   center: true, date: true },
+            'Backtracks':       { key: 'BackCount',      center: true },
+            'Skipped':          { key: 'Skipped',        center: true },
+            'Cycle Time':       { key: 'CycleTime',      center: true },
+            'Resolution':       { key: 'Resolution',     center: false }
           },
           months: [
             'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
           ],
           complete_dates: true,
-          lead_time_threshold: 15,
+          cycle_time_threshold: 15,
 
           launch: function() {
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -73,9 +84,9 @@
             this._mask.show();
 
             this.total_stats = {
-              C: { name: 'CV Defects' },
-              D: { name: 'Defects' },
-              S: { name: 'Stories' }
+              C: { name: 'CV Defects', skipped: 0 },
+              D: { name: 'Defects', skipped: 0 },
+              S: { name: 'Stories', skipped: 0 }
             };
 
             this.start_date = ts.record.raw.ReleaseStartDate;
@@ -185,10 +196,10 @@
                   if (success) {
                     data.filter(function(d) {
                       return (
-                          d.get('_PreviousValues.ScheduleState') == null
-                          || d.get('_PreviousValues.ScheduleState').length > 0
-                        )
-                        && d.get('Project') == that.project_oid;
+                        d.get('_PreviousValues.ScheduleState')
+                        && d.get('_PreviousValues.ScheduleState').length > 0
+                        && d.get('Project') == that.project_oid
+                      );
                     }).forEach(function(d) {
                       hashed_stories[d.get('ObjectID')].data.Revisions.push({
                         from: d.get('_PreviousValues.ScheduleState'),
@@ -276,7 +287,7 @@
             }
 
             // Calculate the transition dates.
-            var dates = [null, null, null, null, null, null];
+            var dates = [story.CreationDate, null, null, null, null, null];
             var indices = ['Idea', 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
             var back_count = 0;
             var back_flag = false;
@@ -295,7 +306,7 @@
 
             // Fill in missing dates.
             var filled = [false, false, false, false, false, false];
-            if (this.complete_dates && (dates[0] || dates[1]) && dates[5]) {
+            if (this.complete_dates && dates[5]) {
               for (var i = 4; i >= 3; i -= 1) {
                 if (!dates[i]) {
                   dates[i] = dates[i + 1];
@@ -303,45 +314,16 @@
                 }
               }
 
-              if (dates[0]) {
-                for (var i = 1; i <= 2; i += 1) {
-                  if (!dates[i]) {
-                    dates[i] = dates[i - 1];
-                    filled[i] = true;
-                  }
-                }
-              } else {
-                if (!dates[2]) {
-                  dates[2] = dates[1];
-                  filled[2] = true;
-                }
+              if (!dates[1]) {
+                dates[1] = dates[0];
               }
             }
 
             // Assign the transition dates to the story.
-            if (dates[0]) {
-              story.CreatedDate = dates[0];
-              story.CreatedDateFilled = filled[0];
-            }
-            if (dates[1]) {
-              story.DefinedDate = dates[1];
-              story.DefinedDateFilled = filled[1];
-            }
-            if (dates[2]) {
-              story.StartedDate = dates[2];
-              story.StartedDateFilled = filled[2];
-            }
-            if (dates[3]) {
-              story.CompletedDate = dates[3];
-              story.CompletedDateFilled = filled[3];
-            }
-            if (dates[4]) {
-              story.AcceptedDate = dates[4];
-              story.AcceptedDateFilled = filled[4];
-            }
-            if (dates[5]) {
-              story.ReleasedDate = dates[5];
-              story.ReleasedDateFilled = filled[5];
+            var names = ['Created', 'Defined', 'Started', 'Completed', 'Accepted', 'Released'];
+            for (var i = 0; i < 6; i += 1) {
+              story[names[i] + 'Date'] = dates[i];
+              story[names[i] + 'DateFilled'] = filled[i];
             }
             story.BackCount = back_count;
 
@@ -358,19 +340,17 @@
               story.Skipped = 'Y';
             }
 
-            // Calculate lead time.
+            // Calculate cycle time.
             if (story.StartedDate && story.ReleasedDate) {
-              story.LeadTimeMs = story.ReleasedDate - story.StartedDate;
+              story.CycleTimeMs = story.ReleasedDate - story.StartedDate;
               for (var d = new Date(story.StartedDate); d <= story.ReleasedDate;
                    d.setDate(d.getDate() + 1)) {
                 if (d.getDay() == 0 || d.getDay() == 6) {
-                  story.LeadTimeMs -= 24 * 60 * 60 * 1000;
+                  story.CycleTimeMs -= 24 * 60 * 60 * 1000;
                 }
               }
 
-              story.LeadTime = this.format_ms(story.LeadTimeMs);
-              story.LeadTimeCeil = this.format_ms(story.LeadTimeMs, 'ceil');
-              story.LeadTimeRound = this.format_ms(story.LeadTimeMs, 'round');
+              story.CycleTime = this.format_ms(story.CycleTimeMs, 'ceil');
             }
 
             // Process the next story.
@@ -390,8 +370,16 @@
             var that = this;
 
             // Filter out CV Defects that were not resolved.
+            // Also filter out artifacts that lack a StartedDate.
             var filt_stories = stories.filter(function(s) {
-              return !(s._type == 'C' && !s.Resolution.match(/[cC]hange$/));
+              var skip = (
+                s._type == 'C'
+                && !s.Resolution.match(/[cC]hange$/)
+              ) || s.Skipped;
+              if (skip) {
+                that.total_stats[s._type].skipped += 1;
+              }
+              return !skip;
             });
 
             // Throughput.
@@ -437,24 +425,35 @@
               }
             });
 
-            this.build_html(stories);
+            this.removeAll();
+            this.build_stats_table();
+            this.build_table(stories);
             this.build_plot(stories);
             this.build_flow_dia(stories);
             this._mask.hide();
           },
 
-          // Construct the HTML table to display the story data.
-          build_html: function(stories) {
-            var that = this;
+          // Return a label for a particular data point.
+          label_datum: function(datum, type) {
+            if (datum == 1) {
+              if (type == 'S') {
+                return '' + datum + ' story';
+              } else {
+                return '' + datum + ' defect';
+              }
+            } else {
+              if (type == 'S') {
+                return '' + datum + ' stories';
+              } else {
+                return '' + datum + ' defects';
+              }
+            }
+          },
 
-            // The table.
-            var table = '<table><thead><tr><th>' +
-              Object.keys(this.columns).join('</th><th>') +
-              '</th></tr></thead>';
-            stories.forEach(function(story) {
-              table += that.build_table_row(story);
-            });
-            table += '</table>';
+          // Construct the HTML table to display the calculated
+          // flow data.
+          build_stats_table: function() {
+            var that = this;
 
             // The table-wide statistics.
             var stats = '<table><thead><tr><th>Type</th>' +
@@ -462,26 +461,45 @@
               '<th title="Number of stories or defects released in this quarter.">Released Throughput</th>' +
               '<th title="Average number of stories or defects released each week this quarter.">Weekly Released Avg.</th>' +
               '<th title="Average cycle time (from Started to Released) for stories or defects this quarter.">Release Cycle Time Avg.</th>' +
+              '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date, and CV defects that were administratively resolved.">Skipped</th>' +
               '</tr></thead>';
             Object.keys(this.total_stats).forEach(function(t) {
               var ts = that.total_stats[t];
-              var label = 'defects';
-              if (t == 'S') {
-                label = 'stories';
-              }
               stats += '<tr><td class="center">' + ts.name + '</td>';
-              stats += '<td class="center">' + ts.throughput_a.toLocaleString() + ' ' + label + '</td>';
-              stats += '<td class="center">' + ts.throughput_r.toLocaleString() + ' ' + label + '</td>';
-              stats += '<td class="center">' + ts.weekly_r.toLocaleString() + ' ' + label + '</td>';
+              stats += '<td class="center">' + that.label_datum(ts.throughput_a.toLocaleString(), t) + '</td>';
+              stats += '<td class="center">' + that.label_datum(ts.throughput_r.toLocaleString(), t) + '</td>';
+              stats += '<td class="center">' + that.label_datum(ts.weekly_r.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.format_ms(ts.cycle_time) + '</td>';
+              stats += '<td class="center">' + that.label_datum(ts.skipped, t) + '</td>';
               stats += '</tr>';
             });
             stats += '</table>';
 
-            this.removeAll();
             this.add({
               xtype: 'component',
-              html: stats + '<br />' + table
+              html: stats
+            });
+          },
+
+          // Construct the HTML table to display the story data.
+          build_table: function(stories) {
+            var that = this;
+
+            // The toggle button.
+            var button = '<br /><a id="toggle_link" href="javascript:;" onclick="toggle_big_table()">Show all stories</a><br />';
+
+            // The table.
+            var table = '<table style="display: none" id="big_table"><thead><tr><th>' +
+              Object.keys(this.columns).join('</th><th>') +
+              '</th></tr></thead>';
+            stories.forEach(function(story) {
+              table += that.build_table_row(story);
+            });
+            table += '</table>';
+
+            this.add({
+              xtype: 'component',
+              html: button + table
             });
           },
 
@@ -542,8 +560,8 @@
             var omitted = 0;
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
-                if (s.LeadTimeMs && s.ReleasedDate) {
-                  var d = s.LeadTimeMs / 1000 / 60 / 60 / 24;
+                if (s.CycleTimeMs && s.ReleasedDate) {
+                  var d = s.CycleTimeMs / 1000 / 60 / 60 / 24;
                   var n = s.Name;
                   if (n.length > 40) {
                     n = n.substring(0, 37) + '...';
@@ -562,10 +580,10 @@
                   return null;
                 }
               }).filter(function(p) { 
-                if (p && p.y >= that.lead_time_threshold) {
+                if (p && p.y >= that.cycle_time_threshold) {
                   omitted += 1;
                 }
-                return p && p.y < that.lead_time_threshold;
+                return p && p.y < that.cycle_time_threshold;
               });
             });
 
@@ -578,8 +596,8 @@
                   type: 'bubble',
                   zoomType: 'xy'
                 },
-                title: { text: 'Lead Time This Quarter' },
-                subtitle: { text: '<em>' + omitted + ' stories and defects with lead times longer than ' + this.lead_time_threshold + ' days have been omitted.</em>' },
+                title: { text: 'Cycle Time This Quarter' },
+                subtitle: { text: '<em>' + omitted + ' artifact' + (omitted == 1 ? '' : 's') + ' with cycle times longer than ' + this.cycle_time_threshold + ' days have been omitted.</em>' },
                 xAxis: { 
                   title: { text: 'Release date' },
                   labels: { 
@@ -589,14 +607,14 @@
                   }
                 },
                 yAxis: { 
-                  title: { text: 'Lead time (days)' },
+                  title: { text: 'Cycle time (days)' },
                   min: 0
                 },
                 tooltip: {
                   pointFormat: 
                     '<b>{point.fid}</b>: {point.name}<br />' +
                     'Released on {point.day} {point.month} {point.year}<br />' +
-                    'Lead time: {point.y:.2f} days<br />' +
+                    'Cycle time: {point.y:.2f} days<br />' +
                     'Estimated at {point.z} points'
                 },
                 plotOptions: {
