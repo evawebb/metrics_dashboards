@@ -83,12 +83,6 @@
             this._mask.msg = 'Fetching iterations...';
             this._mask.show();
 
-            this.total_stats = {
-              C: { name: 'CV Defects', skipped: 0 },
-              D: { name: 'Defects', skipped: 0 },
-              S: { name: 'Stories', skipped: 0 }
-            };
-
             this.start_date = ts.record.raw.ReleaseStartDate;
             this.end_date = ts.record.raw.ReleaseDate;
 
@@ -367,7 +361,11 @@
           calculate_statistics: function(stories) {
             this._mask.msg = 'Calculating overall statistics...';
             this._mask.show();
-            var that = this;
+            total_stats = {
+              C: { name: 'CV Defects', skipped: 0 },
+              D: { name: 'Defects', skipped: 0 },
+              S: { name: 'Stories', skipped: 0 }
+            };
 
             // Filter out CV Defects that were not resolved.
             // Also filter out artifacts that lack a StartedDate.
@@ -377,17 +375,17 @@
                 && !s.Resolution.match(/[cC]hange$/)
               ) || s.Skipped;
               if (skip) {
-                that.total_stats[s._type].skipped += 1;
+                total_stats[s._type].skipped += 1;
               }
               return !skip;
             });
 
             // Throughput.
-            Object.keys(this.total_stats).forEach(function(t) {
-              that.total_stats[t].throughput_r = filt_stories.filter(function(s) {
+            Object.keys(total_stats).forEach(function(t) {
+              total_stats[t].throughput_r = filt_stories.filter(function(s) {
                 return (s._type == t && s.ReleasedDate);
               }).length;
-              that.total_stats[t].throughput_a = filt_stories.filter(function(s) {
+              total_stats[t].throughput_a = filt_stories.filter(function(s) {
                 return (s._type == t && (s.AcceptedDate || s.ReleasedDate));
               }).length;
             });
@@ -403,30 +401,30 @@
                 weekdays += 1;
               }
             }
-            Object.keys(this.total_stats).forEach(function(t) {
-              that.total_stats[t].weekly_r = that.total_stats[t].throughput_r / (weekdays / 5.0);
+            Object.keys(total_stats).forEach(function(t) {
+              total_stats[t].weekly_r = total_stats[t].throughput_r / (weekdays / 5.0);
             });
 
             // Average cycle time.
-            Object.keys(this.total_stats).forEach(function(t) {
-              that.total_stats[t].cycle_time = 0;
-              that.total_stats[t].cycle_count = 0;
+            Object.keys(total_stats).forEach(function(t) {
+              total_stats[t].cycle_time = 0;
+              total_stats[t].cycle_count = 0;
             });
             filt_stories.forEach(function(s) {
               if (s.StartedDate && s.ReleasedDate) {
-                that.total_stats[s._type].cycle_time += 
+                total_stats[s._type].cycle_time += 
                   (s.ReleasedDate - s.StartedDate);
-                that.total_stats[s._type].cycle_count += 1;
+                total_stats[s._type].cycle_count += 1;
               }
             });
-            Object.keys(this.total_stats).forEach(function(t) {
-              if (that.total_stats[t].cycle_count > 0) {
-                that.total_stats[t].cycle_time /= that.total_stats[t].cycle_count;
+            Object.keys(total_stats).forEach(function(t) {
+              if (total_stats[t].cycle_count > 0) {
+                total_stats[t].cycle_time /= total_stats[t].cycle_count;
               }
             });
 
             this.removeAll();
-            this.build_stats_table();
+            this.build_stats_table(total_stats);
             this.build_table(stories);
             this.build_plot(stories);
             this.build_flow_dia(stories);
@@ -452,7 +450,7 @@
 
           // Construct the HTML table to display the calculated
           // flow data.
-          build_stats_table: function() {
+          build_stats_table: function(total_stats) {
             var that = this;
 
             // The table-wide statistics.
@@ -463,8 +461,8 @@
               '<th title="Average cycle time (from Started to Released) for stories or defects this quarter.">Release Cycle Time Avg.</th>' +
               '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date, and CV defects that were administratively resolved.">Skipped</th>' +
               '</tr></thead>';
-            Object.keys(this.total_stats).forEach(function(t) {
-              var ts = that.total_stats[t];
+            Object.keys(total_stats).forEach(function(t) {
+              var ts = total_stats[t];
               stats += '<tr><td class="center">' + ts.name + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.throughput_a.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.throughput_r.toLocaleString(), t) + '</td>';
