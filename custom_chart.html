@@ -334,7 +334,7 @@
 
             // Fill in missing dates.
             var filled = [false, false, false, false, false, false];
-            if (this.complete_dates && dates[5]) {
+            if (this.complete_dates) {
               for (var i = 4; i >= 3; i -= 1) {
                 if (!dates[i]) {
                   dates[i] = dates[i + 1];
@@ -396,6 +396,7 @@
           calculate_statistics: function(stories) {
             this._mask.msg = 'Calculating overall statistics...';
             this._mask.show();
+            var that = this;
             total_stats = {
               C: { name: 'CV Defects', skipped: 0 },
               D: { name: 'Defects', skipped: 0 },
@@ -405,14 +406,22 @@
             // Filter out CV Defects that were not resolved.
             // Also filter out artifacts that lack a StartedDate.
             var filt_stories = stories.filter(function(s) {
-              var skip = (
-                s._type == 'C'
-                && !s.Resolution.match(/[cC]hange$/)
-              ) || s.Skipped;
-              if (skip) {
-                total_stats[s._type].skipped += 1;
+              if (
+                s[that.cycle_time_end_state + 'Date']
+                && !(
+                  s._type == 'C'
+                  && !s.Resolution.match(/[cC]hange$/)
+                )
+              ) {
+                if (s.Skipped) {
+                  total_stats[s._type].skipped += 1;
+                  return false;
+                } else {
+                  return true;
+                }
+              } else {
+                return false;
               }
-              return !skip;
             });
 
             // Throughput.
