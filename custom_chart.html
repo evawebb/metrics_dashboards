@@ -367,7 +367,7 @@
               // Complete the Started date if it can be
               // reasonably assumed.
               if (
-                !dates[2]
+                !dates[2] && dates[1] && dates[3]
                 && dates[1].toDateString() == dates[3].toDateString()
               ) {
                 dates[2] = dates[1];
