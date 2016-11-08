@@ -226,8 +226,13 @@
                   if (success) {
                     data.filter(function(d) {
                       return (
-                        d.get('_PreviousValues.ScheduleState')
-                        && d.get('_PreviousValues.ScheduleState').length > 0
+                        (
+                          (
+                            d.get('_PreviousValues.ScheduleState')
+                            && d.get('_PreviousValues.ScheduleState').length > 0
+                          )
+                          || d.get('_PreviousValues.ScheduleState') === null
+                        )
                         && d.get('Project') == that.project_oid
                       );
                     }).forEach(function(d) {
@@ -318,20 +323,22 @@
 
             // Calculate the transition dates.
             var dates = [story.CreationDate, null, story.InProgressDate, null, story.AcceptedDate, null];
-            var indices = ['Idea', 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
+            var indices = ['This is junk data so that the CreationDate is not overwritten', 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
             var back_count = 0;
             var back_flag = false;
             story.Revisions.forEach(function(r) {
               var i = indices.indexOf(r.to);
-              dates[i] = new Date(r.on);
-              for (var j = i + 1; j < indices.length; j += 1) {
-                if (!back_flag && dates[j]) {
-                  back_count += 1;
-                  back_flag = true;
+              if (i >= 0) {
+                dates[i] = new Date(r.on);
+                for (var j = i + 1; j < indices.length; j += 1) {
+                  if (!back_flag && dates[j]) {
+                    back_count += 1;
+                    back_flag = true;
+                  }
+                  dates[j] = null;
                 }
-                dates[j] = null;
+                back_flag = false;
               }
-              back_flag = false;
             });
 
             // Fill in missing dates.
