@@ -62,11 +62,15 @@
             return [
               {
                 name: 'Cycle Time Start State',
-                xtype: 'rallytextfield'
+                xtype: 'rallycombobox',
+                editable: false,
+                store: ['Created', 'Defined', 'Started', 'Completed', 'Accepted', 'Released']
               },
               {
                 name: 'Cycle Time End State',
-                xtype: 'rallytextfield'
+                xtype: 'rallycombobox',
+                editable: false,
+                store: ['Created', 'Defined', 'Started', 'Completed', 'Accepted', 'Released']
               }
             ];
           },
