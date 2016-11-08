@@ -547,7 +547,7 @@
               stats += '<td class="center">' + that.label_datum(ts.throughput_a.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.throughput_r.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.weekly_r.toLocaleString(), t) + '</td>';
-              stats += '<td class="center">' + that.format_ms(ts.cycle_time) + '</td>';
+              stats += '<td class="center">' + that.format_ms(ts.cycle_time, 'ceil') + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.skipped, t) + '</td>';
               stats += '</tr>';
             });
