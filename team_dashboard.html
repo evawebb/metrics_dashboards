@@ -17,7 +17,7 @@
       }
 
       Rally.onReady(function () {
-        Ext.define('ZzacksApp', {
+        Ext.define('ZzacksTeamDashboardApp', {
           extend: 'Rally.app.TimeboxScopedApp',
           scopeType: 'release',
           data_keys: [
@@ -56,7 +56,7 @@
           complete_dates: true,
           cycle_time_start_state: 'Started',
           cycle_time_end_state: 'Released',
-          cycle_time_threshold: 15,
+          cycle_time_threshold: 25,
 
           getUserSettingsFields: function() {
             return [
@@ -90,9 +90,13 @@
           launch: function() {
             if (this.getSettings()['Cycle Time Start State']) {
               this.cycle_time_start_state = this.getSettings()['Cycle Time Start State'];
+            } else {
+              this.getSettings()['Cycle Time Start State'] = this.cycle_time_start_state;
             }
             if (this.getSettings()['Cycle Time End State']) {
               this.cycle_time_end_state = this.getSettings()['Cycle Time End State'];
+            } else {
+              this.getSettings()['Cycle Time End State'] = this.cycle_time_end_state;
             }
 
             this._mask = new Ext.LoadMask(Ext.getBody(), {
@@ -117,8 +121,7 @@
             });
           },
 
-          // Create a list of filters, one for each iteration in the selected
-          // quarter.
+          // Fetch a list of the names of the iterations in this quarter.
           fetch_iterations: function(ts) {
             this._mask.msg = 'Fetching iterations...';
             this._mask.show();
@@ -810,7 +813,7 @@
           }
         });
 
-        Rally.launchApp('ZzacksApp');
+        Rally.launchApp('ZzacksTeamDashboardApp');
       });
     </script>
 
