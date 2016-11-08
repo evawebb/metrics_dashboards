@@ -344,6 +344,8 @@
             // Fill in missing dates.
             var filled = [false, false, false, false, false, false];
             if (this.complete_dates) {
+              // Complete the last three dates by copying
+              // from the right.
               for (var i = 4; i >= 3; i -= 1) {
                 if (!dates[i]) {
                   dates[i] = dates[i + 1];
@@ -351,9 +353,21 @@
                 }
               }
 
+              // Complete the Defined date by copying the Created
+              // date.
               if (!dates[1]) {
                 dates[1] = dates[0];
                 filled[1] = true;
+              }
+
+              // Complete the Started date if it can be
+              // reasonably assumed.
+              if (
+                !dates[2]
+                && dates[1].toDateString() == dates[3].toDateString()
+              ) {
+                dates[2] = dates[1];
+                filled[2] = true;
               }
             }
 
