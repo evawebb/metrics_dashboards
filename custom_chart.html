@@ -29,7 +29,9 @@
             'Tags',
             'RevisionHistory',
             'Revisions',
-            'CreationDate'
+            'CreationDate',
+            'InProgressDate',
+            'AcceptedDate'
           ],
           columns: {
             'FormattedID':      { key: 'FormattedID',    center: true },
@@ -315,7 +317,7 @@
             }
 
             // Calculate the transition dates.
-            var dates = [story.CreationDate, null, null, null, null, null];
+            var dates = [story.CreationDate, null, story.InProgressDate, null, story.AcceptedDate, null];
             var indices = ['Idea', 'Defined', 'In-Progress', 'Completed', 'Accepted', 'Released'];
             var back_count = 0;
             var back_flag = false;
@@ -344,6 +346,7 @@
 
               if (!dates[1]) {
                 dates[1] = dates[0];
+                filled[1] = true;
               }
             }
 
