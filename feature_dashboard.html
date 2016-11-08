@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+      Rally.onReady(function () {
+        Ext.define('ZzacksFeatureDashboardApp', {
+          extend: 'Rally.app.TimeboxScopedApp',
+          scopeType: 'release',
+
+          getUserSettingsFields: function() {
+            return []
+          },
+
+          onSettingsUpdate: function(settings) {
+            console.log('Settings update:', settings);
+          },
+
+          launch: function() {
+            this._mask = new Ext.LoadMask(Ext.getBody(), {
+              msg: 'Please wait...'
+            });
+            this._mask.show();
+
+            this.fetch_iterations(this.getContext().getTimeboxScope());
+          },
+
+          onTimeboxScopeChange: function(ts) {
+            this._mask.show();
+            this.fetch_iterations(ts);
+          },
+
+          haltEarly: function(msg) {
+            this._mask.hide();
+            this.removeAll();
+            this.add({
+              xtype: 'component',
+              html: 'Error: ' + msg
+            });
+          },
+
+          // Fetch a list of the names of the iterations in this quarter.
+          fetch_iterations: function(ts) {
+            this._mask.msg = 'Fetching iterations...';
+            this._mask.show();
+
+            this.start_date = ts.record.raw.ReleaseStartDate;
+            this.end_date = ts.record.raw.ReleaseDate;
+
+            var store = Ext.create('Rally.data.wsapi.Store', {
+              model: 'Iteration',
+              fetch: ['Name', 'StartDate'],
+              filters: [
+                {
+                  property: 'StartDate',
+                  operator: '>=',
+                  value: this.start_date
+                },
+                {
+                  property: 'StartDate',
+                  operator: '<',
+                  value: this.end_date
+                }
+              ]
+            }, this);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                if (operation.wasSuccessful()) {
+                  this.num_iterations = records.filter(function(r) {
+                    return r.get('StartDate').getTime() < Date.now();
+                  }).length;
+
+                  var iterations = records.map(function(r) {
+                    return r.get('Name');
+                  });
+
+                  if (iterations.length > 0) {
+                    this.fetch_features(iterations, []);
+                  } else {
+                    this.haltEarly('No iterations found.');
+                  }
+                }
+              }
+            });
+          },
+
+          fetch_features: function(iterations, features) {
+            this._mask.msg = 'Fetching features...';
+            this._mask.show();
+
+            var store = Ext.create('Rally.data.Store', {
+              model: 'PortfolioItem',
+              fetch: ['Name'],
+              filters: [
+                {
+                  property: 'Iteration.Name',
+                  value: iterations[0]
+                }
+              ]
+            }, this);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                iterations.shift();
+                if (iterations.length > 0) {
+                  this.fetch_features(iterations, 
+                    operation.wasSuccessful() ?
+                      features.concat(records) :
+                      features);
+                } else {
+                  console.log(features.map(function(f) {
+                    return f.get('Name');
+                  }));
+                }
+              }
+            });
+          }
+        });
+
+        Rally.launchApp('ZzacksFeatureDashboardApp');
+      });
+    </script>
+  </head>
+  <body>
+    <div>x</div>
+  </body>
+</html>
