@@ -44,10 +44,10 @@
             this._mask.msg = 'Fetching features...';
             this._mask.show();
 
+            this.estimates = {};
             this.start_date = ts.record.raw.ReleaseStartDate;
             this.end_date = ts.record.raw.ReleaseDate;
             var release_name = ts.record.get('Name');
-            console.log('Release:', release_name);
 
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['PortfolioItem/Feature'],
@@ -63,7 +63,6 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  console.log('Number of features: ' + records.length);
                   this.fetch_stories(records, []);
                 }
               }
@@ -74,9 +73,10 @@
             this._mask.msg = 'Fetching stories...';
             this._mask.show();
 
+            var that = this;
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
-              fetch: ['ObjectID'],
+              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID'],
               filters: [
                 {
                   property: 'Feature.Name',
@@ -88,6 +88,9 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
+                  records.forEach(function(r) {
+                    that.estimates[r.get('FormattedID')] = r.get('PlanEstimate');
+                  });
                   stories = stories.concat(records.map(
                     function(r) {
                       return r.get('ObjectID');
@@ -99,7 +102,6 @@
                 if (features.length > 0) {
                   this.fetch_stories(features, stories);
                 } else {
-                  console.log('Number of stories:', stories.length);
                   this.fetch_histories(stories);
                 }
               }
@@ -138,7 +140,6 @@
                   if (success) {
                     creation_dates = {};
                     release_dates = {};
-                    estimates = {};
                     data.filter(function(d) {
                       return (
                         (
@@ -149,7 +150,6 @@
                       );
                     }).forEach(function(d) {
                       var fid = d.get('FormattedID');
-                      estimates[fid] = d.get('PlanEstimate');
                       creation_dates[fid] = new Date(d.get('CreationDate')).toDateString();
                       if (d.get('ScheduleState') == 'Released') {
                         release_dates[fid] = new Date(d.get('_ValidFrom')).toDateString();
@@ -158,26 +158,19 @@
                       }
                     });
                     
-                    var fids = [];
-                    Object.keys(release_dates).concat(Object.keys(creation_dates)).forEach(function(fid) {
-                      if (fids.indexOf(fid) < 0) {
-                        fids.push(fid);
-                      }
-                    });
-
-                    fids.forEach(function(s) {
+                    Object.keys(that.estimates).forEach(function(s) {
                       var c_date = creation_dates[s];
                       if (deltas[c_date]) {
-                        deltas[c_date].planned += estimates[s];
+                        deltas[c_date].planned += that.estimates[s];
                       } else {
-                        deltas[Object.keys(deltas)[0]].planned += estimates[s];
+                        deltas[Object.keys(deltas)[0]].planned += that.estimates[s];
                       }
 
                       var r_date = release_dates[s];
                       if (deltas[r_date]) {
-                        deltas[r_date].released += estimates[s];
+                        deltas[r_date].released += that.estimates[s];
                       } else {
-                        console.log(r_date + ' ' + Object.keys(deltas)[0]);
+                        console.log(r_date, '|', Object.keys(deltas)[0], '|', that.estimates[s]);
                       }
                     });
 
