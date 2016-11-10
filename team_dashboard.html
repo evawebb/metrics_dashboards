@@ -186,13 +186,13 @@
             store.load({
               scope: this,
               callback: function(records, operation) {
+                if (operation.wasSuccessful()) {
+                  stories.concat(records);
+                }
                 iterations.shift();
+
                 if (iterations.length > 0) {
-                  this.fetch_stories(iterations,
-                    operation.wasSuccessful() ?
-                      stories.concat(records) :
-                      stories
-                  );
+                  this.fetch_stories(iterations, stories);
                 } else {
                   if (stories.length > 0) {
                     this.fetch_histories(stories);
@@ -798,7 +798,7 @@
                   title: { enabled: false },
                   tickInterval: 7
                 },
-                yAxis: { title: { enabled: false } },
+                yAxis: { title: { text: 'Total points' } },
                 plotOptions: {
                   area: {
                     stacking: 'normal',
