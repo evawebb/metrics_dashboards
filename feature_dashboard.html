@@ -30,6 +30,12 @@
               end_date: new Date('04/22/2016 11:59 PM MDT')
             }
           ],
+          colors: {
+            '2016 Q4': '#0000ff',
+            '2016 Q3': '#ff0000',
+            '2016 Q2': '#c0c000',
+            '2016 Q1': '#00ffc0'
+          },
           histories_cluster_size: 300,
 
           getUserSettingsFields: function() {
@@ -103,7 +109,7 @@
             var that = this;
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
-              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature'],
+              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature', 'CreationDate'],
               filters: [
                 {
                   property: 'Feature.Name',
@@ -200,6 +206,7 @@
               }
               for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
                 r_deltas[d.toDateString()] = {
+                  created: 0,
                   released: 0
                 };
               }
@@ -208,9 +215,16 @@
 
             stories.forEach(function(s) {
               var r_date = release_dates[s.get('FormattedID')];
+              var c_date = s.get('CreationDate').toDateString();
               var release = release_lookups[s.get('Feature').Name];
               if (deltas[release][r_date]) {
                 deltas[release][r_date].released += s.get('PlanEstimate');
+              }
+
+              if (deltas[release][c_date]) {
+                deltas[release][c_date].created += s.get('PlanEstimate');
+              } else {
+                deltas[release][Object.keys(deltas[release])[0]].created += s.get('PlanEstimate');
               }
             });
             
@@ -220,6 +234,7 @@
                 var d_prev = Object.keys(r_deltas)[i];
                 var d_next = Object.keys(r_deltas)[i + 1];
                 r_deltas[d_next].released += r_deltas[d_prev].released;
+                r_deltas[d_next].created += r_deltas[d_prev].created;
               }
             });
             this.build_chart(deltas);
@@ -229,16 +244,31 @@
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
+            var that = this;
             var series = [];
             Object.keys(deltas).forEach(function(release) {
-              var set = {
+              var released_set = {
                 name: release,
-                data: []
+                data: [],
+                color: that.colors[release]
+              };
+              var created_set = {
+                name: release + ' Scope',
+                data: [],
+                color: that.colors[release],
+                dashStyle: 'Dot',
+                visible: release == that.releases[0].name
               };
               Object.keys(deltas[release]).forEach(function(d) {
-                set.data.push(deltas[release][d].released);
+                released_set.data.push({
+                  y: deltas[release][d].released,
+                  date: d
+                });
+                created_set.data.push(deltas[release][d].created);
               });
-              series.push(set);
+
+              series.push(released_set);
+              series.push(created_set);
             });
 
             this.removeAll();
@@ -257,6 +287,12 @@
                 yAxis: { 
                   title: { text: 'Total points' },
                   min: 0
+                },
+                tooltip: {
+                  headerFormat: '<span style="font-size: 10px">{series.name}</span><br/>',
+                  pointFormat:
+                    '<b>{point.y} points</b><br />' +
+                    'on {point.date}'
                 },
                 plotOptions: { line: {
                   lineWidth: 3,
