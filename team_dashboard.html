@@ -187,7 +187,7 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  stories.concat(records);
+                  stories = stories.concat(records);
                 }
                 iterations.shift();
 

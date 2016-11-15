@@ -8,6 +8,29 @@
         Ext.define('ZzacksFeatureDashboardApp', {
           extend: 'Rally.app.TimeboxScopedApp',
           scopeType: 'release',
+          releases: [
+            {
+              name: '2016 Q4',
+              start_date: new Date('10/10/2016 12:00 AM MDT'),
+              end_date: new Date('01/13/2017 11:59 PM MST')
+            },
+            {
+              name: '2016 Q3',
+              start_date: new Date('07/18/2016 12:00 AM MDT'),
+              end_date: new Date('10/07/2016 11:59 PM MDT')
+            },
+            {
+              name: '2016 Q2',
+              start_date: new Date('04/25/2016 12:00 AM MDT'),
+              end_date: new Date('07/15/2016 11:59 PM MDT')
+            },
+            {
+              name: '2016 Q1',
+              start_date: new Date('01/18/2016 12:00 AM MST'),
+              end_date: new Date('04/22/2016 11:59 PM MDT')
+            }
+          ],
+          histories_cluster_size: 300,
 
           getUserSettingsFields: function() {
             return []
@@ -23,12 +46,9 @@
             });
             this._mask.show();
 
-            this.fetch_features(this.getContext().getTimeboxScope());
-          },
-
-          onTimeboxScopeChange: function(ts) {
-            this._mask.show();
-            this.fetch_features(ts);
+            this.fetch_features(this.releases.map(function(r) {
+              return r.name;
+            }), [], {});
           },
 
           haltEarly: function(msg) {
@@ -40,22 +60,19 @@
             });
           },
 
-          fetch_features: function(ts) {
-            this._mask.msg = 'Fetching features...';
+          fetch_features: function(release_names, features, release_lookups) {
+            this._mask.msg = 'Fetching features... (' + release_names.length + ' releases left)';
             this._mask.show();
 
-            this.estimates = {};
-            this.start_date = ts.record.raw.ReleaseStartDate;
-            this.end_date = ts.record.raw.ReleaseDate;
-            var release_name = ts.record.get('Name');
-
+            var that = this;
+            
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['PortfolioItem/Feature'],
               fetch: ['Name', 'Release'],
               filters: [
                 {
                   property: 'Release.Name',
-                  value: release_name
+                  value: release_names[0]
                 }
               ]
             }, this);
@@ -63,20 +80,30 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  this.fetch_stories(records, []);
+                  records.forEach(function(r) {
+                    release_lookups[r.get('Name')] = release_names[0];
+                  });
+                  features = features.concat(records);
+                }
+                release_names.shift();
+
+                if (release_names.length > 0) {
+                  this.fetch_features(release_names, features, release_lookups);
+                } else {
+                  this.fetch_stories(features, [], release_lookups);
                 }
               }
             });
           },
 
-          fetch_stories: function(features, stories) {
-            this._mask.msg = 'Fetching stories...';
+          fetch_stories: function(features, stories, release_lookups) {
+            this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
             this._mask.show();
 
             var that = this;
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
-              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID'],
+              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature'],
               filters: [
                 {
                   property: 'Feature.Name',
@@ -88,58 +115,42 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  records.forEach(function(r) {
-                    that.estimates[r.get('FormattedID')] = r.get('PlanEstimate');
-                  });
-                  stories = stories.concat(records.map(
-                    function(r) {
-                      return r.get('ObjectID');
-                    }
-                  ));
+                  stories = stories.concat(records);
                 }
                 features.shift();
 
                 if (features.length > 0) {
-                  this.fetch_stories(features, stories);
+                  this.fetch_stories(features, stories, release_lookups);
                 } else {
-                  this.fetch_histories(stories);
+                  this.fetch_histories(stories, 0, {}, release_lookups);
                 }
               }
             });
           },
 
-          fetch_histories: function(stories) {
-            this._mask.msg = 'Fetching story histories...';
+          fetch_histories: function(stories, index, release_dates, release_lookups) {
+            this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
             this._mask.show();
 
-            var deltas = {};
-            var now = new Date();
-            if (new Date(this.end_date) < now) {
-              now = new Date(this.end_date);
-            }
-            for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
-              deltas[d.toDateString()] = {
-                planned: 0,
-                released: 0
-              };
-            }
-            
+            var story_oids = stories.slice(index, index + this.histories_cluster_size)
+              .map(function(s) {
+                return s.get('ObjectID');
+              });
+
             var that = this;
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-              fetch: ['Name', 'FormattedID', 'ScheduleState', '_PreviousValues.ScheduleState', 'PlanEstimate', '_ValidFrom', 'CreationDate'],
+              fetch: ['Name', 'FormattedID', 'ScheduleState', '_PreviousValues.ScheduleState', 'PlanEstimate', '_ValidFrom'],
               hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
               filters: [
                 {
                   property: 'ObjectID',
                   operator: 'in',
-                  value: stories
+                  value: story_oids
                 }
               ],
               listeners: {
                 load: function(store, data, success) {
                   if (success) {
-                    creation_dates = {};
-                    release_dates = {};
                     data.filter(function(d) {
                       return (
                         (
@@ -150,7 +161,6 @@
                       );
                     }).forEach(function(d) {
                       var fid = d.get('FormattedID');
-                      creation_dates[fid] = new Date(d.get('CreationDate')).toDateString();
                       if (d.get('ScheduleState') == 'Released') {
                         release_dates[fid] = new Date(d.get('_ValidFrom')).toDateString();
                       } else {
@@ -158,29 +168,20 @@
                       }
                     });
                     
-                    Object.keys(that.estimates).forEach(function(s) {
-                      var c_date = creation_dates[s];
-                      if (deltas[c_date]) {
-                        deltas[c_date].planned += that.estimates[s];
-                      } else {
-                        deltas[Object.keys(deltas)[0]].planned += that.estimates[s];
-                      }
-
-                      var r_date = release_dates[s];
-                      if (deltas[r_date]) {
-                        deltas[r_date].released += that.estimates[s];
-                      } else {
-                        console.log(r_date, '|', Object.keys(deltas)[0], '|', that.estimates[s]);
-                      }
-                    });
-
-                    for (var i = 0; i < Object.keys(deltas).length - 1; i += 1) {
-                      var d_prev = Object.keys(deltas)[i];
-                      var d_next = Object.keys(deltas)[i + 1];
-                      deltas[d_next].planned += deltas[d_prev].planned;
-                      deltas[d_next].released += deltas[d_prev].released;
+                    if (index < stories.length) {
+                      that.fetch_histories(
+                        stories, 
+                        index + that.histories_cluster_size, 
+                        release_dates, 
+                        release_lookups
+                      );
+                    } else {
+                      that.construct_series(
+                        release_dates, 
+                        stories, 
+                        release_lookups
+                      );
                     }
-                    that.build_chart(deltas);
                   }
                 }
               }
@@ -188,17 +189,56 @@
             store.load({ scope: this });
           },
 
+          construct_series: function(release_dates, stories, release_lookups) {
+            var that = this;
+            var deltas = {};
+            this.releases.forEach(function(r) {
+              var r_deltas = {};
+              var now = new Date();
+              if (new Date(r.end_date) < now) {
+                now = new Date(r.end_date);
+              }
+              for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+                r_deltas[d.toDateString()] = {
+                  released: 0
+                };
+              }
+              deltas[r.name] = r_deltas;
+            });
+
+            stories.forEach(function(s) {
+              var r_date = release_dates[s.get('FormattedID')];
+              var release = release_lookups[s.get('Feature').Name];
+              if (deltas[release][r_date]) {
+                deltas[release][r_date].released += s.get('PlanEstimate');
+              }
+            });
+            
+            Object.keys(deltas).forEach(function(r) {
+              var r_deltas = deltas[r];
+              for (var i = 0; i < Object.keys(r_deltas).length - 1; i += 1) {
+                var d_prev = Object.keys(r_deltas)[i];
+                var d_next = Object.keys(r_deltas)[i + 1];
+                r_deltas[d_next].released += r_deltas[d_prev].released;
+              }
+            });
+            this.build_chart(deltas);
+          },
+
           build_chart: function(deltas) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
-            var planned_series = [];
-            var released_series = [];
-            var dates = [];
-            Object.keys(deltas).forEach(function(d) {
-              planned_series.push(deltas[d].planned);
-              released_series.push(deltas[d].released);
-              dates.push(d);
+            var series = [];
+            Object.keys(deltas).forEach(function(release) {
+              var set = {
+                name: release,
+                data: []
+              };
+              Object.keys(deltas[release]).forEach(function(d) {
+                set.data.push(deltas[release][d].released);
+              });
+              series.push(set);
             });
 
             this.removeAll();
@@ -206,24 +246,13 @@
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
-                series: [
-                  {
-                    name: 'Released',
-                    data: released_series
-                  },
-                  {
-                    name: 'Planned',
-                    data: planned_series
-                  }
-                ],
-                categories: dates
+                series: series.reverse()
               },
               chartConfig: {
                 chart: { type: 'line' },
                 title: { text: 'Points released for features this quarter' },
                 xAxis: { 
-                  title: { enabled: false },
-                  tickInterval: 7
+                  title: { text: 'Days into the quarter' }
                 },
                 yAxis: { 
                   title: { text: 'Total points' },
