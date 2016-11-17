@@ -206,8 +206,10 @@
               }
               for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
                 r_deltas[d.toDateString()] = {
-                  created: 0,
-                  released: 0
+                  released_pts: 0,
+                  created_pts: 0,
+                  released_stories: 0,
+                  created_stories: 0
                 };
               }
               deltas[r.name] = r_deltas;
@@ -218,13 +220,16 @@
               var c_date = s.get('CreationDate').toDateString();
               var release = release_lookups[s.get('Feature').Name];
               if (deltas[release][r_date]) {
-                deltas[release][r_date].released += s.get('PlanEstimate');
+                deltas[release][r_date].released_pts += s.get('PlanEstimate');
+                deltas[release][r_date].released_stories += 1;
               }
 
               if (deltas[release][c_date]) {
-                deltas[release][c_date].created += s.get('PlanEstimate');
+                deltas[release][c_date].created_pts += s.get('PlanEstimate');
+                deltas[release][c_date].created_stories += 1;
               } else {
-                deltas[release][Object.keys(deltas[release])[0]].created += s.get('PlanEstimate');
+                deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
+                deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
               }
             });
             
@@ -233,72 +238,133 @@
               for (var i = 0; i < Object.keys(r_deltas).length - 1; i += 1) {
                 var d_prev = Object.keys(r_deltas)[i];
                 var d_next = Object.keys(r_deltas)[i + 1];
-                r_deltas[d_next].released += r_deltas[d_prev].released;
-                r_deltas[d_next].created += r_deltas[d_prev].created;
+                r_deltas[d_next].released_pts += r_deltas[d_prev].released_pts;
+                r_deltas[d_next].released_stories += r_deltas[d_prev].released_stories;
+                r_deltas[d_next].created_pts += r_deltas[d_prev].created_pts;
+                r_deltas[d_next].created_stories += r_deltas[d_prev].created_stories;
               }
             });
-            this.build_chart(deltas);
+            this.build_charts(deltas);
           },
 
-          build_chart: function(deltas) {
+          build_charts: function(deltas) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
             var that = this;
-            var series = [];
+            var series_pts = [];
+            var series_stories = [];
             Object.keys(deltas).forEach(function(release) {
-              var released_set = {
+              var released_config = {
                 name: release,
-                data: [],
                 color: that.colors[release]
               };
-              var created_set = {
+              var created_config = {
                 name: release + ' Scope',
-                data: [],
                 color: that.colors[release],
                 dashStyle: 'Dot',
                 visible: release == that.releases[0].name
               };
+              var released_pts_data = [];
+              var created_pts_data = [];
+              var released_stories_data = [];
+              var created_stories_data = [];
+
               Object.keys(deltas[release]).forEach(function(d) {
-                released_set.data.push({
-                  y: deltas[release][d].released,
+                released_pts_data.push({
+                  y: deltas[release][d].released_pts,
                   date: d
                 });
-                created_set.data.push(deltas[release][d].created);
+                created_pts_data.push({
+                  y: deltas[release][d].created_pts,
+                  date: d
+                });
+                released_stories_data.push({
+                  y: deltas[release][d].released_stories,
+                  date: d
+                });
+                created_stories_data.push({
+                  y: deltas[release][d].created_stories,
+                  date: d
+                });
               });
 
-              series.push(released_set);
-              series.push(created_set);
+              series_pts.push(Object.assign(
+                { data: released_pts_data },
+                released_config
+              ));
+              series_pts.push(Object.assign(
+                { data: created_pts_data },
+                created_config
+              ));
+              series_stories.push(Object.assign(
+                { data: released_stories_data },
+                released_config
+              ));
+              series_stories.push(Object.assign(
+                { data: created_stories_data },
+                created_config
+              ));
             });
 
             this.removeAll();
-            var chart = this.add({
+            var chart_config = {
+              chart: { type: 'line' },
+              xAxis: { 
+                title: { text: 'Days into the quarter' }
+              },
+              plotOptions: { line: {
+                lineWidth: 3,
+                marker: { enabled: false }
+              }}
+            };
+            var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
+            var tooltip_point = '<b>{point.y} {unit}</b><br /> on {point.date}';
+
+            // Add the velocity chart.
+            this.add({
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
-                series: series.reverse()
+                series: series_pts.reverse()
               },
-              chartConfig: {
-                chart: { type: 'line' },
-                title: { text: 'Points released for features this quarter' },
-                xAxis: { 
-                  title: { text: 'Days into the quarter' }
+              chartConfig: Object.assign(
+                {
+                  title: { text: 'Points released for features this quarter' },
+                  yAxis: { 
+                    title: { text: 'Total points' },
+                    min: 0
+                  },
+                  tooltip: {
+                    headerFormat: tooltip_header,
+                    pointFormat: tooltip_point.replace('{unit}', 'points')
+                  }
                 },
-                yAxis: { 
-                  title: { text: 'Total points' },
-                  min: 0
+                chart_config
+              )
+            });
+            
+            // Add the throughput chart.
+            this.add({
+              xtype: 'rallychart',
+              loadMask: false,
+              chartData: {
+                series: series_stories.reverse()
+              },
+              chartConfig: Object.assign(
+                {
+                  title: { text: 'Stories released for features this quarter' },
+                  yAxis: {
+                    title: { text: 'Total stories' },
+                    min: 0
+                  },
+                  tooltip: {
+                    headerFormat: tooltip_header,
+                    pointFormat: tooltip_point.replace('{unit}', 'stories')
+                  }
                 },
-                tooltip: {
-                  headerFormat: '<span style="font-size: 10px">{series.name}</span><br/>',
-                  pointFormat:
-                    '<b>{point.y} points</b><br />' +
-                    'on {point.date}'
-                },
-                plotOptions: { line: {
-                  lineWidth: 3,
-                  marker: { enabled: false }
-                }}
-              }
+                chart_config
+              )
             });
 
             this._mask.hide();
