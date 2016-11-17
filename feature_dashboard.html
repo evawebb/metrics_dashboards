@@ -52,9 +52,11 @@
             });
             this._mask.show();
 
-            this.fetch_features(this.releases.map(function(r) {
+            var release_names = this.releases.map(function(r) {
               return r.name;
-            }), [], {});
+            });
+            this.fetch_features(release_names, [], {});
+            this.test();
           },
 
           haltEarly: function(msg) {
@@ -102,6 +104,77 @@
             });
           },
 
+          test: function() {
+            var that = this;
+            
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+              models: ['PortfolioItem/Feature'],
+              fetch: ['Name', 'Release', 'State', 'CreationDate', 'FormattedID', 'LastUpdateDate', 'ObjectID'],
+              filters: [
+                {
+                  property: 'Release',
+                  value: null
+                },
+                {
+                  property: 'LastUpdateDate',
+                  operator: '>=',
+                  value: that.releases[0].start_date
+                },
+                {
+                  property: 'FormattedID',
+                  value: 'F13626'
+                }
+              ]
+            }, this);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                if (operation.wasSuccessful()) {
+                  console.log('Number of unscheduled features:', records.length);
+                  console.log(records[0].get('ObjectID'), records[0].get('FormattedID'));
+                  that.test2(records.map(function(r) {
+                    return r.get('FormattedID');
+                  }));
+                }
+              }
+            });
+          },
+
+          test2: function(feature_names) {
+            var that = this;
+
+            var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+              fetch: [
+                'Release', '_PreviousValues.Release', 
+                '_ValidFrom', '_PreviousValues'
+              ],
+              filters: [
+                // {
+                //   property: 'Feature.Name',
+                //   operator: 'in',
+                //   value: feature_names
+                // }
+                {
+                  property: 'ObjectID',
+                  value: 23914098925
+                }
+              ],
+              listeners: {
+                load: function(store, data, success) {
+                  if (success) {
+                    console.log(data.map(function(d) {
+                      return d.get('_PreviousValues');
+                      // return d.get('Release') + ' -> ' + d.get('_PreviousValues.Release') + ', ' + d.get('_ValidFrom');
+                    }));
+                  } else {
+                    console.log('failure');
+                  }
+                }
+              }
+            });
+            store.load({ scope: this });
+          },
+
           fetch_stories: function(features, stories, release_lookups) {
             this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
             this._mask.show();
@@ -145,7 +218,11 @@
 
             var that = this;
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-              fetch: ['Name', 'FormattedID', 'ScheduleState', '_PreviousValues.ScheduleState', 'PlanEstimate', '_ValidFrom'],
+              fetch: [
+                'Name', 'FormattedID', 'ScheduleState', 
+                '_PreviousValues.ScheduleState', 
+                'PlanEstimate', '_ValidFrom'
+              ],
               hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
               filters: [
                 {
@@ -174,7 +251,7 @@
                       }
                     });
                     
-                    if (index < stories.length) {
+                    if (index + that.histories_cluster_size < stories.length) {
                       that.fetch_histories(
                         stories, 
                         index + that.histories_cluster_size, 
@@ -319,7 +396,7 @@
               }}
             };
             var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
-            var tooltip_point = '<b>{point.y} {unit}</b><br /> on {point.date}';
+            var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
 
             // Add the velocity chart.
             this.add({
