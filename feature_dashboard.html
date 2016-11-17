@@ -36,6 +36,9 @@
             '2016 Q2': '#c0c000',
             '2016 Q1': '#00ffc0'
           },
+          drops: {
+            //61568308539: new Date('10/30/2016 12:00 AM MST').toDateString()
+          },
           histories_cluster_size: 300,
 
           getUserSettingsFields: function() {
@@ -55,7 +58,7 @@
             var release_names = this.releases.map(function(r) {
               return r.name;
             });
-            this.fetch_features(release_names, [], {});
+            this.fetch_committed_features(release_names, [], {});
             this.test();
           },
 
@@ -68,7 +71,7 @@
             });
           },
 
-          fetch_features: function(release_names, features, release_lookups) {
+          fetch_committed_features: function(release_names, features, release_lookups) {
             this._mask.msg = 'Fetching features... (' + release_names.length + ' releases left)';
             this._mask.show();
 
@@ -96,20 +99,23 @@
                 release_names.shift();
 
                 if (release_names.length > 0) {
-                  this.fetch_features(release_names, features, release_lookups);
+                  this.fetch_committed_features(release_names, features, release_lookups);
                 } else {
-                  this.fetch_stories(features, [], release_lookups);
+                  //this.fetch_stories(features, [], release_lookups);
+                  this.fetch_unscheduled_features(features, release_lookups);
                 }
               }
             });
           },
 
-          test: function() {
+          fetch_unscheduled_features: function(features, release_lookups) {
+            this._mask.msg = 'Fetching unscheduled features...';
+            this._mask.show();
             var that = this;
-            
+
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['PortfolioItem/Feature'],
-              fetch: ['Name', 'Release', 'State', 'CreationDate', 'FormattedID', 'LastUpdateDate', 'ObjectID'],
+              fetch: ['Name', 'Release', 'ObjectID', 'RevisionHistory'],
               filters: [
                 {
                   property: 'Release',
@@ -119,10 +125,36 @@
                   property: 'LastUpdateDate',
                   operator: '>=',
                   value: that.releases[0].start_date
-                },
+                }
+              ]
+            }, this);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                this.fetch_unschedule_dates(features, release_lookups, records);
+              }
+            });
+          },
+
+          fetch_unschedule_dates(features, release_lookups, unsched_rhoids) {
+            this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_rhoids.length + ' features left)';
+            this._mask.show();
+            var that = this;
+
+            var store = Ext.create('Rally.data.wsapi.Store', {
+              model: 'Revision',
+              fetch: ['Description', 'CreationDate'],
+              filters: [
                 {
-                  property: 'FormattedID',
-                  value: 'F13626'
+                  property: 'RevisionHistory.ObjectID',
+                  value: unsched_rhoids[0].get('RevisionHistory')
+                    ._ref.split('/').reverse()[0]
+                }
+              ],
+              sorters: [
+                {
+                  property: 'RevisionNumber',
+                  direction: 'ASC'
                 }
               ]
             }, this);
@@ -130,49 +162,24 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  console.log('Number of unscheduled features:', records.length);
-                  console.log(records[0].get('ObjectID'), records[0].get('FormattedID'));
-                  that.test2(records.map(function(r) {
-                    return r.get('FormattedID');
-                  }));
+                  records.filter(function(r) {
+                    return r.get('Description').match(/RELEASE removed/);
+                  }).forEach(function(r) {
+                    release_lookups[unsched_rhoids[0].get('Name')] = 
+                      r.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
+                    that.drops[unsched_rhoids[0].get('ObjectID')] = 
+                      r.get('CreationDate').toDateString();
+                  });
+                }
+
+                features.push(unsched_rhoids.shift());
+                if (unsched_rhoids.length > 0) {
+                  this.fetch_unschedule_dates(features, release_lookups, unsched_rhoids);
+                } else {
+                  this.fetch_stories(features, [], release_lookups);
                 }
               }
             });
-          },
-
-          test2: function(feature_names) {
-            var that = this;
-
-            var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-              fetch: [
-                'Release', '_PreviousValues.Release', 
-                '_ValidFrom', '_PreviousValues'
-              ],
-              filters: [
-                // {
-                //   property: 'Feature.Name',
-                //   operator: 'in',
-                //   value: feature_names
-                // }
-                {
-                  property: 'ObjectID',
-                  value: 23914098925
-                }
-              ],
-              listeners: {
-                load: function(store, data, success) {
-                  if (success) {
-                    console.log(data.map(function(d) {
-                      return d.get('_PreviousValues');
-                      // return d.get('Release') + ' -> ' + d.get('_PreviousValues.Release') + ', ' + d.get('_ValidFrom');
-                    }));
-                  } else {
-                    console.log('failure');
-                  }
-                }
-              }
-            });
-            store.load({ scope: this });
           },
 
           fetch_stories: function(features, stories, release_lookups) {
@@ -293,20 +300,36 @@
             });
 
             stories.forEach(function(s) {
-              var r_date = release_dates[s.get('FormattedID')];
-              var c_date = s.get('CreationDate').toDateString();
               var release = release_lookups[s.get('Feature').Name];
-              if (deltas[release][r_date]) {
-                deltas[release][r_date].released_pts += s.get('PlanEstimate');
-                deltas[release][r_date].released_stories += 1;
-              }
+              if (deltas.hasOwnProperty(release)) {
+                var r_date = release_dates[s.get('FormattedID')];
+                var c_date = s.get('CreationDate').toDateString();
+                var drop = that.drops[s.get('Feature').ObjectID];
 
-              if (deltas[release][c_date]) {
-                deltas[release][c_date].created_pts += s.get('PlanEstimate');
-                deltas[release][c_date].created_stories += 1;
-              } else {
-                deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
-                deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
+                if (r_date && deltas[release][r_date]) {
+                  deltas[release][r_date].released_pts += s.get('PlanEstimate');
+                  deltas[release][r_date].released_stories += 1;
+
+                  if (drop && deltas[release][drop]) {
+                    deltas[release][drop].released_pts -= s.get('PlanEstimate');
+                    deltas[release][drop].released_stories -= 1;
+                  }
+                }
+
+                if (c_date && deltas[release]) {
+                  if (deltas[release][c_date]) {
+                    deltas[release][c_date].created_pts += s.get('PlanEstimate');
+                    deltas[release][c_date].created_stories += 1;
+                  } else {
+                    deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
+                    deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
+                  }
+
+                  if (drop && deltas[release][drop]) {
+                    deltas[release][drop].created_pts -= s.get('PlanEstimate');
+                    deltas[release][drop].created_stories -= 1;
+                  }
+                }
               }
             });
             
