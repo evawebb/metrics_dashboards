@@ -480,22 +480,43 @@
               total_stats[t].weekly_r = total_stats[t].throughput_r / (weekdays / 5.0);
             });
 
-            // Average cycle time.
+            // Average and median cycle time.
             Object.keys(total_stats).forEach(function(t) {
-              total_stats[t].cycle_time = 0;
+              total_stats[t].cycle_times = [];
               total_stats[t].cycle_count = 0;
             });
             var cst = this.cycle_time_start_state + 'Date';
             var cet = this.cycle_time_end_state + 'Date';
             filt_stories.forEach(function(s) {
               if (s[cst] && s[cet]) {
-                total_stats[s._type].cycle_time += (s[cet] - s[cst]);
+                var this_cycle_time = s[cet] - s[cst];
+                for (var d = new Date(s[cst]); d <= s[cet]; d.setDate(d.getDate() + 1)) {
+                  if (d.getDay() == 0 || d.getDay() == 6) {
+                    this_cycle_time -= 1000 * 60 * 60 * 24;
+                  }
+                }
+                total_stats[s._type].cycle_times.push(this_cycle_time);
                 total_stats[s._type].cycle_count += 1;
               }
             });
             Object.keys(total_stats).forEach(function(t) {
               if (total_stats[t].cycle_count > 0) {
-                total_stats[t].cycle_time /= total_stats[t].cycle_count;
+                total_stats[t].cycle_times.sort(function(a, b) {
+                  return a - b;
+                });
+                var cts = total_stats[t].cycle_times;
+
+                total_stats[t].cycle_time = 
+                  cts.reduce(function(a, b) {
+                    return a + b;
+                  }, 0) / 
+                  total_stats[t].cycle_count;
+
+                if (cts.length % 2 == 0 ) {
+                  total_stats[t].median_ct = (cts[cts.length / 2 - 1] + cts[cts.length / 2]) / 2;
+                } else {
+                  total_stats[t].median_ct = cts[Math.floor(cts.length / 2)];
+                }
               }
             });
 
@@ -546,7 +567,8 @@
               '<th title="Number of stories or defects released in this quarter.">Released Throughput</th>' +
               '<th title="Average number of stories or defects released each week this quarter.">Weekly Released Avg.</th>' +
               '<th title="Average cycle time (from ' + this.cycle_time_start_state + ' to ' + this.cycle_time_end_state + ') for stories or defects this quarter.">Cycle Time Avg.</th>' +
-              '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date, and CV defects that were administratively resolved.">Skipped</th>' +
+              '<th title="Median cycle time (from ' + this.cycle_time_start_state + ' to ' + this.cycle_time_end_state + ') for stories or defects this quarter.">Cycle Time Median</th>' +
+              '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date.">Skipped</th>' +
               '</tr></thead>';
             Object.keys(total_stats).forEach(function(t) {
               var ts = total_stats[t];
@@ -555,6 +577,7 @@
               stats += '<td class="center">' + that.label_datum(ts.throughput_r.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.weekly_r.toLocaleString(), t) + '</td>';
               stats += '<td class="center">' + that.format_ms(ts.cycle_time, 'ceil') + '</td>';
+              stats += '<td class="center">' + that.format_ms(ts.median_ct, 'ceil') + '</td>';
               stats += '<td class="center">' + that.label_datum(ts.skipped, t) + '</td>';
               stats += '</tr>';
             });
