@@ -145,9 +145,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Iterations query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   this.num_iterations = records.filter(function(r) {
                     return r.get('StartDate').getTime() < Date.now();
@@ -183,9 +186,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   stories = stories.concat(records);
                 }
@@ -216,6 +222,7 @@
             });
 
             var that = this;
+            var t1 = new Date();
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
               fetch: ['ScheduleState', '_PreviousValues.ScheduleState', 'Project', '_PreviousValues.Project', '_ValidFrom', '_ValidTo'],
               hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
@@ -230,6 +237,8 @@
               ],
               listeners: {
                 load: function(store, data, success) {
+                  var t2 = new Date();
+                  console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
                   if (success) {
                     data.filter(function(d) {
                       return (
@@ -255,6 +264,7 @@
                 }
               }
             });
+            t1 = new Date();
             store.load({ scope: this });
           },
 

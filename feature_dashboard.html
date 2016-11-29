@@ -87,9 +87,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   records.forEach(function(r) {
                     release_lookups[r.get('Name')] = release_names[0];
@@ -128,9 +131,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 this.fetch_unschedule_dates(features, release_lookups, records);
               }
             });
@@ -158,9 +164,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   records.filter(function(r) {
                     return r.get('Description').match(/RELEASE removed/);
@@ -197,9 +206,12 @@
                 }
               ]
             }, this);
+            var t1 = new Date();
             store.load({
               scope: this,
               callback: function(records, operation) {
+                var t2 = new Date();
+                console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   stories = stories.concat(records);
                 }
@@ -224,6 +236,7 @@
               });
 
             var that = this;
+            var t1 = new Date();
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
               fetch: [
                 'Name', 'FormattedID', 'ScheduleState', 
@@ -240,6 +253,8 @@
               ],
               listeners: {
                 load: function(store, data, success) {
+                  var t2 = new Date();
+                  console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
                   if (success) {
                     data.filter(function(d) {
                       return (
@@ -276,6 +291,7 @@
                 }
               }
             });
+            t1 = new Date();
             store.load({ scope: this });
           },
 
