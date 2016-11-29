@@ -5,40 +5,10 @@
 
     <script type="text/javascript">
       Rally.onReady(function () {
-        Ext.define('ZzacksFeatureDashboardApp', {
+        Ext.define('ZzacksInitiativeDashboardApp', {
           extend: 'Rally.app.TimeboxScopedApp',
           scopeType: 'release',
-          releases: [
-            {
-              name: '2016 Q4',
-              start_date: new Date('10/10/2016 12:00 AM MDT'),
-              end_date: new Date('01/13/2017 11:59 PM MST')
-            },
-            {
-              name: '2016 Q3',
-              start_date: new Date('07/18/2016 12:00 AM MDT'),
-              end_date: new Date('10/07/2016 11:59 PM MDT')
-            },
-            {
-              name: '2016 Q2',
-              start_date: new Date('04/25/2016 12:00 AM MDT'),
-              end_date: new Date('07/15/2016 11:59 PM MDT')
-            },
-            {
-              name: '2016 Q1',
-              start_date: new Date('01/18/2016 12:00 AM MST'),
-              end_date: new Date('04/22/2016 11:59 PM MDT')
-            }
-          ],
-          colors: {
-            '2016 Q4': '#0000ff',
-            '2016 Q3': '#ff0000',
-            '2016 Q2': '#c0c000',
-            '2016 Q1': '#00ffc0'
-          },
-          drops: {
-            //61568308539: new Date('10/30/2016 12:00 AM MST').toDateString()
-          },
+          drops: {},
           histories_cluster_size: 300,
 
           getUserSettingsFields: function() {
@@ -55,10 +25,7 @@
             });
             this._mask.show();
 
-            var release_names = this.releases.map(function(r) {
-              return r.name;
-            });
-            this.fetch_committed_features(release_names, [], {});
+            this.fetch_initiative();
           },
 
           haltEarly: function(msg) {
@@ -70,8 +37,35 @@
             });
           },
 
-          fetch_committed_features: function(release_names, features, release_lookups) {
-            this._mask.msg = 'Fetching features... (' + release_names.length + ' releases left)';
+          fetch_initiative: function() {
+            this._mask.msg = 'Fetching initiative...';
+            this._mask.show();
+
+            var that = this;
+
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+              models: ['PortfolioItem/Initiative'],
+              filters: {
+                property: 'FormattedID',
+                value: 'I4099'
+              }
+            }, this);
+            store.load({
+              scope: this,
+              callback: function(records, operation) {
+                if (operation.wasSuccessful()) {
+                  console.log(records.map(function(r) {
+                    return r.get('Name');
+                  }));
+                }
+
+                that.fetch_committed_features();
+              }
+            });
+          },
+
+          fetch_committed_features: function() {
+            this._mask.msg = 'Fetching features...';
             this._mask.show();
 
             var that = this;
@@ -82,7 +76,11 @@
               filters: [
                 {
                   property: 'Release.Name',
-                  value: release_names[0]
+                  value: '2016 Q4'
+                },
+                {
+                  property: 'Parent.FormattedID',
+                  value: 'I4099'
                 }
               ]
             }, this);
@@ -93,24 +91,14 @@
                 var t2 = new Date();
                 console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
-                  records.forEach(function(r) {
-                    release_lookups[r.get('Name')] = release_names[0];
-                  });
-                  features = features.concat(records);
-                }
-                release_names.shift();
-
-                if (release_names.length > 0) {
-                  this.fetch_committed_features(release_names, features, release_lookups);
-                } else {
-                  //this.fetch_stories(features, [], release_lookups);
-                  this.fetch_unscheduled_features(features, release_lookups);
+                  //that.fetch_unscheduled_features(records);
+                  that.fetch_stories(records, []);
                 }
               }
             });
           },
 
-          fetch_unscheduled_features: function(features, release_lookups) {
+          fetch_unscheduled_features: function(features) {
             this._mask.msg = 'Fetching unscheduled features...';
             this._mask.show();
             var that = this;
@@ -124,9 +112,8 @@
                   value: null
                 },
                 {
-                  property: 'LastUpdateDate',
-                  operator: '>=',
-                  value: that.releases[0].start_date
+                  property: 'Parent.FormattedID',
+                  value: 'I4099'
                 }
               ]
             }, this);
@@ -136,12 +123,12 @@
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-                this.fetch_unschedule_dates(features, release_lookups, records);
+                this.fetch_unschedule_dates(features, records);
               }
             });
           },
 
-          fetch_unschedule_dates(features, release_lookups, unsched_rhoids) {
+          fetch_unschedule_dates(features, unsched_rhoids) {
             this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_rhoids.length + ' features left)';
             this._mask.show();
             var that = this;
@@ -173,8 +160,6 @@
                   records.filter(function(r) {
                     return r.get('Description').match(/RELEASE removed/);
                   }).forEach(function(r) {
-                    release_lookups[unsched_rhoids[0].get('Name')] = 
-                      r.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
                     that.drops[unsched_rhoids[0].get('ObjectID')] = 
                       r.get('CreationDate').toDateString();
                   });
@@ -182,15 +167,15 @@
 
                 features.push(unsched_rhoids.shift());
                 if (unsched_rhoids.length > 0) {
-                  this.fetch_unschedule_dates(features, release_lookups, unsched_rhoids);
+                  this.fetch_unschedule_dates(features, unsched_rhoids);
                 } else {
-                  this.fetch_stories(features, [], release_lookups);
+                  this.fetch_stories(features, []);
                 }
               }
             });
           },
 
-          fetch_stories: function(features, stories, release_lookups) {
+          fetch_stories: function(features, stories) {
             this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
             this._mask.show();
 
@@ -217,15 +202,15 @@
                 features.shift();
 
                 if (features.length > 0) {
-                  this.fetch_stories(features, stories, release_lookups);
+                  this.fetch_stories(features, stories);
                 } else {
-                  this.fetch_histories(stories, 0, {}, release_lookups);
+                  this.fetch_histories(stories, 0, {});
                 }
               }
             });
           },
 
-          fetch_histories: function(stories, index, release_dates, release_lookups) {
+          fetch_histories: function(stories, index, release_dates) {
             this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
             this._mask.show();
 
@@ -242,7 +227,10 @@
                 '_PreviousValues.ScheduleState', 
                 'PlanEstimate', '_ValidFrom'
               ],
-              hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
+              hydrate: [
+                'ScheduleState', 
+                '_PreviousValues.ScheduleState'
+              ],
               filters: [
                 {
                   property: 'ObjectID',
@@ -276,14 +264,12 @@
                       that.fetch_histories(
                         stories, 
                         index + that.histories_cluster_size, 
-                        release_dates, 
-                        release_lookups
+                        release_dates
                       );
                     } else {
                       that.construct_series(
                         release_dates, 
-                        stories, 
-                        release_lookups
+                        stories
                       );
                     }
                   }
@@ -294,71 +280,58 @@
             store.load({ scope: this });
           },
 
-          construct_series: function(release_dates, stories, release_lookups) {
+          construct_series: function(release_dates, stories) {
             var that = this;
             var deltas = {};
-            this.releases.forEach(function(r) {
-              var r_deltas = {};
-              var now = new Date();
-              if (new Date(r.end_date) < now) {
-                now = new Date(r.end_date);
-              }
-              for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
-                r_deltas[d.toDateString()] = {
-                  released_pts: 0,
-                  created_pts: 0,
-                  released_stories: 0,
-                  created_stories: 0
-                };
-              }
-              deltas[r.name] = r_deltas;
-            });
+            var now = new Date();
+            for (var d = new Date('10/10/2016 12:00 AM MDT'); d <= now; d.setDate(d.getDate() + 1)) {
+              deltas[d.toDateString()] = {
+                released_pts: 0,
+                created_pts: 0,
+                released_stories: 0,
+                created_stories: 0
+              };
+            }
 
             stories.forEach(function(s) {
-              var release = release_lookups[s.get('Feature').Name];
-              if (deltas.hasOwnProperty(release)) {
-                var r_date = release_dates[s.get('FormattedID')];
-                var c_date = s.get('CreationDate').toDateString();
-                var drop = that.drops[s.get('Feature').ObjectID];
+              var r_date = release_dates[s.get('FormattedID')];
+              var c_date = s.get('CreationDate').toDateString();
+              var drop = that.drops[s.get('Feature').ObjectID];
 
-                if (r_date && deltas[release][r_date]) {
-                  deltas[release][r_date].released_pts += s.get('PlanEstimate');
-                  deltas[release][r_date].released_stories += 1;
+              if (r_date && deltas[r_date]) {
+                deltas[r_date].released_pts += s.get('PlanEstimate');
+                deltas[r_date].released_stories += 1;
 
-                  if (drop && deltas[release][drop]) {
-                    deltas[release][drop].released_pts -= s.get('PlanEstimate');
-                    deltas[release][drop].released_stories -= 1;
-                  }
+                if (drop && deltas[drop]) {
+                  deltas[drop].released_pts -= s.get('PlanEstimate');
+                  deltas[drop].released_stories -= 1;
+                }
+              }
+
+              if (c_date) {
+                if (deltas[c_date]) {
+                  deltas[c_date].created_pts += s.get('PlanEstimate');
+                  deltas[c_date].created_stories += 1;
+                } else {
+                  deltas[Object.keys(deltas)[0]].created_pts += s.get('PlanEstimate');
+                  deltas[Object.keys(deltas)[0]].created_stories += 1;
                 }
 
-                if (c_date && deltas[release]) {
-                  if (deltas[release][c_date]) {
-                    deltas[release][c_date].created_pts += s.get('PlanEstimate');
-                    deltas[release][c_date].created_stories += 1;
-                  } else {
-                    deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
-                    deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
-                  }
-
-                  if (drop && deltas[release][drop]) {
-                    deltas[release][drop].created_pts -= s.get('PlanEstimate');
-                    deltas[release][drop].created_stories -= 1;
-                  }
+                if (drop && deltas[drop]) {
+                  deltas[drop].created_pts -= s.get('PlanEstimate');
+                  deltas[drop].created_stories -= 1;
                 }
               }
             });
             
-            Object.keys(deltas).forEach(function(r) {
-              var r_deltas = deltas[r];
-              for (var i = 0; i < Object.keys(r_deltas).length - 1; i += 1) {
-                var d_prev = Object.keys(r_deltas)[i];
-                var d_next = Object.keys(r_deltas)[i + 1];
-                r_deltas[d_next].released_pts += r_deltas[d_prev].released_pts;
-                r_deltas[d_next].released_stories += r_deltas[d_prev].released_stories;
-                r_deltas[d_next].created_pts += r_deltas[d_prev].created_pts;
-                r_deltas[d_next].created_stories += r_deltas[d_prev].created_stories;
-              }
-            });
+            for (var i = 0; i < Object.keys(deltas).length - 1; i += 1) {
+              var d_prev = Object.keys(deltas)[i];
+              var d_next = Object.keys(deltas)[i + 1];
+              deltas[d_next].released_pts += deltas[d_prev].released_pts;
+              deltas[d_next].released_stories += deltas[d_prev].released_stories;
+              deltas[d_next].created_pts += deltas[d_prev].created_pts;
+              deltas[d_next].created_stories += deltas[d_prev].created_stories;
+            }
             this.build_charts(deltas);
           },
 
@@ -369,58 +342,55 @@
             var that = this;
             var series_pts = [];
             var series_stories = [];
-            Object.keys(deltas).forEach(function(release) {
-              var released_config = {
-                name: release,
-                color: that.colors[release]
-              };
-              var created_config = {
-                name: release + ' Scope',
-                color: that.colors[release],
-                dashStyle: 'Dot',
-                visible: release == that.releases[0].name
-              };
-              var released_pts_data = [];
-              var created_pts_data = [];
-              var released_stories_data = [];
-              var created_stories_data = [];
+            var released_config = {
+              name: '2016 Q4',
+              color: '#0000ff'
+            };
+            var created_config = {
+              name: '2016 Q4 Scope',
+              color: '#0000ff',
+              dashStyle: 'Dot'
+            };
+            var released_pts_data = [];
+            var created_pts_data = [];
+            var released_stories_data = [];
+            var created_stories_data = [];
 
-              Object.keys(deltas[release]).forEach(function(d) {
-                released_pts_data.push({
-                  y: deltas[release][d].released_pts,
-                  date: d
-                });
-                created_pts_data.push({
-                  y: deltas[release][d].created_pts,
-                  date: d
-                });
-                released_stories_data.push({
-                  y: deltas[release][d].released_stories,
-                  date: d
-                });
-                created_stories_data.push({
-                  y: deltas[release][d].created_stories,
-                  date: d
-                });
+            Object.keys(deltas).forEach(function(d) {
+              released_pts_data.push({
+                y: deltas[d].released_pts,
+                date: d
               });
-
-              series_pts.push(Object.assign(
-                { data: released_pts_data },
-                released_config
-              ));
-              series_pts.push(Object.assign(
-                { data: created_pts_data },
-                created_config
-              ));
-              series_stories.push(Object.assign(
-                { data: released_stories_data },
-                released_config
-              ));
-              series_stories.push(Object.assign(
-                { data: created_stories_data },
-                created_config
-              ));
+              created_pts_data.push({
+                y: deltas[d].created_pts,
+                date: d
+              });
+              released_stories_data.push({
+                y: deltas[d].released_stories,
+                date: d
+              });
+              created_stories_data.push({
+                y: deltas[d].created_stories,
+                date: d
+              });
             });
+
+            series_pts.push(Object.assign(
+              { data: released_pts_data },
+              released_config
+            ));
+            series_pts.push(Object.assign(
+              { data: created_pts_data },
+              created_config
+            ));
+            series_stories.push(Object.assign(
+              { data: released_stories_data },
+              released_config
+            ));
+            series_stories.push(Object.assign(
+              { data: created_stories_data },
+              created_config
+            ));
 
             this.removeAll();
             var chart_config = {
@@ -486,11 +456,11 @@
           }
         });
 
-        Rally.launchApp('ZzacksFeatureDashboardApp');
+        Rally.launchApp('ZzacksInitiativeDashboardApp');
       });
     </script>
   </head>
   <body>
-    <div>無</div>
+    <div>◌</div>
   </body>
 </html>
