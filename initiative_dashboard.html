@@ -12,11 +12,17 @@
           histories_cluster_size: 300,
 
           getUserSettingsFields: function() {
-            return []
+            return [{
+              name: 'Initiative',
+              xtype: 'rallyartifactsearchcombobox',
+              storeConfig: {
+                models: ['PortfolioItem/Initiative']
+              }
+            }];
           },
 
           onSettingsUpdate: function(settings) {
-            console.log('Settings update:', settings);
+            this.fetch_initiative();
           },
 
           launch: function() {
@@ -25,12 +31,16 @@
             });
             this._mask.show();
 
+            if (!this.getSettings().Initiative) {
+              this.getSettings().Initiative = '/portfolioitem/initiative/44772028590';
+            }
             this.fetch_initiative();
           },
 
           haltEarly: function(msg) {
             this._mask.hide();
             this.removeAll();
+            this.add_settings_link();
             this.add({
               xtype: 'component',
               html: 'Error: ' + msg
@@ -46,25 +56,23 @@
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['PortfolioItem/Initiative'],
               filters: {
-                property: 'FormattedID',
-                value: 'I4099'
+                property: 'ObjectID',
+                value: parseInt(that.getSettings().Initiative.split('/').reverse()[0])
               }
             }, this);
             store.load({
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  console.log(records.map(function(r) {
-                    return r.get('Name');
-                  }));
+                  that.fetch_committed_features(records[0].get('FormattedID'));
+                } else {
+                  that.fetch_committed_features('I4099');
                 }
-
-                that.fetch_committed_features();
               }
             });
           },
 
-          fetch_committed_features: function() {
+          fetch_committed_features: function(initiative) {
             this._mask.msg = 'Fetching features...';
             this._mask.show();
 
@@ -80,7 +88,7 @@
                 },
                 {
                   property: 'Parent.FormattedID',
-                  value: 'I4099'
+                  value: initiative
                 }
               ]
             }, this);
@@ -91,8 +99,12 @@
                 var t2 = new Date();
                 console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
-                  //that.fetch_unscheduled_features(records);
-                  that.fetch_stories(records, []);
+                  if (records.length > 0) {
+                    //that.fetch_unscheduled_features(records);
+                    that.fetch_stories(records, []);
+                  } else {
+                    that.haltEarly('No features found.');
+                  }
                 }
               }
             });
@@ -187,6 +199,10 @@
                 {
                   property: 'Feature.Name',
                   value: features[0].get('Name')
+                },
+                {
+                  property: 'DirectChildrenCount',
+                  value: 0
                 }
               ]
             }, this);
@@ -392,7 +408,6 @@
               created_config
             ));
 
-            this.removeAll();
             var chart_config = {
               chart: { type: 'line' },
               xAxis: { 
@@ -405,6 +420,9 @@
             };
             var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
             var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
+
+            this.removeAll();
+            this.add_settings_link();
 
             // Add the velocity chart.
             this.add({
@@ -453,6 +471,15 @@
             });
 
             this._mask.hide();
+          },
+
+          add_settings_link: function() {
+            this.add({
+              xtype: 'component',
+              html: '<a href="javascript:;" onClick="' +
+                    'Rally.getApp().showSettings()' +
+                    '">Modify app settings</a><br />'
+            });
           }
         });
 
