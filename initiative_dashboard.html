@@ -22,7 +22,7 @@
           },
 
           onSettingsUpdate: function(settings) {
-            this.fetch_initiative();
+            this.fetch_initiative(this.getContext().getTimeboxScope());
           },
 
           launch: function() {
@@ -34,7 +34,16 @@
             if (!this.getSettings().Initiative) {
               this.getSettings().Initiative = '/portfolioitem/initiative/44772028590';
             }
-            this.fetch_initiative();
+            this.fetch_initiative(this.getContext().getTimeboxScope());
+          },
+
+          onTimeboxScopeChange: function(ts) {
+            this._mask = new Ext.LoadMask(Ext.getBody(), {
+              msg: 'Please wait...'
+            });
+            this._mask.show();
+
+            this.fetch_initiative(ts);
           },
 
           haltEarly: function(msg) {
@@ -47,7 +56,7 @@
             });
           },
 
-          fetch_initiative: function() {
+          fetch_initiative: function(ts) {
             this._mask.msg = 'Fetching initiative...';
             this._mask.show();
 
@@ -64,18 +73,18 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  that.fetch_committed_features(records[0].data);
+                  that.fetch_committed_features(records[0].data, ts);
                 } else {
                   that.fetch_committed_features({
                     FormattedID: 'I4099',
                     Name: 'Personalized Navigation v1'
-                  });
+                  }, ts);
                 }
               }
             });
           },
 
-          fetch_committed_features: function(initiative) {
+          fetch_committed_features: function(initiative, ts) {
             this._mask.msg = 'Fetching features...';
             this._mask.show();
 
@@ -87,7 +96,7 @@
               filters: [
                 {
                   property: 'Release.Name',
-                  value: '2016 Q4'
+                  value: ts.record.raw.Name
                 },
                 {
                   property: 'Parent.FormattedID',
@@ -104,7 +113,7 @@
                 if (operation.wasSuccessful()) {
                   if (records.length > 0) {
                     //that.fetch_unscheduled_features(records);
-                    that.fetch_stories(records, [], initiative);
+                    that.fetch_stories(records, [], initiative, ts);
                   } else {
                     that.haltEarly('No features found.');
                   }
@@ -128,7 +137,7 @@
                 },
                 {
                   property: 'Parent.FormattedID',
-                  value: 'I4099'
+                  value: 'REPLACE THIS!!!'
                 }
               ]
             }, this);
@@ -190,7 +199,7 @@
             });
           },
 
-          fetch_stories: function(features, stories, initiative) {
+          fetch_stories: function(features, stories, initiative, ts) {
             this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
             this._mask.show();
 
@@ -221,15 +230,15 @@
                 features.shift();
 
                 if (features.length > 0) {
-                  this.fetch_stories(features, stories, initiative);
+                  this.fetch_stories(features, stories, initiative, ts);
                 } else {
-                  this.fetch_histories(stories, 0, {}, initiative);
+                  this.fetch_histories(stories, 0, {}, initiative, ts);
                 }
               }
             });
           },
 
-          fetch_histories: function(stories, index, release_dates, initiative) {
+          fetch_histories: function(stories, index, release_dates, initiative, ts) {
             this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
             this._mask.show();
 
@@ -284,13 +293,15 @@
                         stories, 
                         index + that.histories_cluster_size, 
                         release_dates,
-                        initiative
+                        initiative,
+                        ts
                       );
                     } else {
                       that.construct_series(
                         release_dates, 
                         stories,
-                        initiative
+                        initiative,
+                        ts
                       );
                     }
                   }
@@ -301,11 +312,14 @@
             store.load({ scope: this });
           },
 
-          construct_series: function(release_dates, stories, initiative) {
+          construct_series: function(release_dates, stories, initiative, ts) {
             var that = this;
             var deltas = {};
             var now = new Date();
-            for (var d = new Date('10/10/2016 12:00 AM MDT'); d <= now; d.setDate(d.getDate() + 1)) {
+            if (new Date(ts.record.raw.ReleaseDate) < now) {
+              now = new Date(ts.record.raw.ReleaseDate);
+            }
+            for (var d = new Date(ts.record.raw.ReleaseStartDate); d <= now; d.setDate(d.getDate() + 1)) {
               deltas[d.toDateString()] = {
                 released_pts: 0,
                 created_pts: 0,
@@ -438,7 +452,7 @@
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Points released this quarter for ' + initiative.FormattedID + ': ' + initiative.Name },
+                  title: { text: 'Points released for ' + initiative.FormattedID + ': ' + initiative.Name },
                   yAxis: { 
                     title: { text: 'Total points' },
                     min: 0
@@ -461,7 +475,7 @@
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Stories released this quarter for ' + initiative.FormattedID + ': ' + initiative.Name },
+                  title: { text: 'Stories released for ' + initiative.FormattedID + ': ' + initiative.Name },
                   yAxis: {
                     title: { text: 'Total stories' },
                     min: 0
