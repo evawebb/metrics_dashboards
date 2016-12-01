@@ -112,8 +112,8 @@
                 console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   if (records.length > 0) {
-                    //that.fetch_unscheduled_features(records);
-                    that.fetch_stories(records, [], initiative, ts);
+                    that.fetch_unscheduled_features(records, initiative, ts);
+                    //that.fetch_stories(records, [], initiative, ts);
                   } else {
                     that.haltEarly('No features found.');
                   }
@@ -122,7 +122,7 @@
             });
           },
 
-          fetch_unscheduled_features: function(features) {
+          fetch_unscheduled_features: function(features, initiative, ts) {
             this._mask.msg = 'Fetching unscheduled features...';
             this._mask.show();
             var that = this;
@@ -133,11 +133,13 @@
               filters: [
                 {
                   property: 'Release',
+                  // operator: '!=',
+                  // value: ts.record.raw.Name
                   value: null
                 },
                 {
                   property: 'Parent.FormattedID',
-                  value: 'REPLACE THIS!!!'
+                  value: initiative.FormattedID
                 }
               ]
             }, this);
@@ -147,13 +149,17 @@
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-                this.fetch_unschedule_dates(features, records);
+                if (records && records.length > 0) {
+                  this.fetch_unschedule_dates(features, records, initiative, ts);
+                } else {
+                  this.fetch_stories(features, [], initiative, ts);
+                }
               }
             });
           },
 
-          fetch_unschedule_dates(features, unsched_rhoids) {
-            this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_rhoids.length + ' features left)';
+          fetch_unschedule_dates(features, unsched_features, initiative, ts) {
+            this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_features.length + ' features left)';
             this._mask.show();
             var that = this;
 
@@ -163,7 +169,7 @@
               filters: [
                 {
                   property: 'RevisionHistory.ObjectID',
-                  value: unsched_rhoids[0].get('RevisionHistory')
+                  value: unsched_features[0].get('RevisionHistory')
                     ._ref.split('/').reverse()[0]
                 }
               ],
@@ -182,18 +188,21 @@
                 console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
                 if (operation.wasSuccessful()) {
                   records.filter(function(r) {
-                    return r.get('Description').match(/RELEASE removed/);
+                    return (
+                      r.get('Description').match(/RELEASE removed/)
+                      || r.get('Description').match(new RegExp('RELEASE changed from [' + ts.record.raw.Name + ']'))
+                    );
                   }).forEach(function(r) {
-                    that.drops[unsched_rhoids[0].get('ObjectID')] = 
+                    that.drops[unsched_features[0].get('ObjectID')] = 
                       r.get('CreationDate').toDateString();
                   });
                 }
 
-                features.push(unsched_rhoids.shift());
-                if (unsched_rhoids.length > 0) {
-                  this.fetch_unschedule_dates(features, unsched_rhoids);
+                features.push(unsched_features.shift());
+                if (unsched_features.length > 0) {
+                  this.fetch_unschedule_dates(features, unsched_features, initiative, ts);
                 } else {
-                  this.fetch_stories(features, []);
+                  this.fetch_stories(features, [], initiative, ts);
                 }
               }
             });
