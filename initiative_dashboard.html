@@ -64,9 +64,12 @@
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
-                  that.fetch_committed_features(records[0].get('FormattedID'));
+                  that.fetch_committed_features(records[0].data);
                 } else {
-                  that.fetch_committed_features('I4099');
+                  that.fetch_committed_features({
+                    FormattedID: 'I4099',
+                    Name: 'Personalized Navigation v1'
+                  });
                 }
               }
             });
@@ -88,7 +91,7 @@
                 },
                 {
                   property: 'Parent.FormattedID',
-                  value: initiative
+                  value: initiative.FormattedID
                 }
               ]
             }, this);
@@ -101,7 +104,7 @@
                 if (operation.wasSuccessful()) {
                   if (records.length > 0) {
                     //that.fetch_unscheduled_features(records);
-                    that.fetch_stories(records, []);
+                    that.fetch_stories(records, [], initiative);
                   } else {
                     that.haltEarly('No features found.');
                   }
@@ -187,7 +190,7 @@
             });
           },
 
-          fetch_stories: function(features, stories) {
+          fetch_stories: function(features, stories, initiative) {
             this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
             this._mask.show();
 
@@ -218,15 +221,15 @@
                 features.shift();
 
                 if (features.length > 0) {
-                  this.fetch_stories(features, stories);
+                  this.fetch_stories(features, stories, initiative);
                 } else {
-                  this.fetch_histories(stories, 0, {});
+                  this.fetch_histories(stories, 0, {}, initiative);
                 }
               }
             });
           },
 
-          fetch_histories: function(stories, index, release_dates) {
+          fetch_histories: function(stories, index, release_dates, initiative) {
             this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
             this._mask.show();
 
@@ -280,12 +283,14 @@
                       that.fetch_histories(
                         stories, 
                         index + that.histories_cluster_size, 
-                        release_dates
+                        release_dates,
+                        initiative
                       );
                     } else {
                       that.construct_series(
                         release_dates, 
-                        stories
+                        stories,
+                        initiative
                       );
                     }
                   }
@@ -296,7 +301,7 @@
             store.load({ scope: this });
           },
 
-          construct_series: function(release_dates, stories) {
+          construct_series: function(release_dates, stories, initiative) {
             var that = this;
             var deltas = {};
             var now = new Date();
@@ -348,10 +353,10 @@
               deltas[d_next].created_pts += deltas[d_prev].created_pts;
               deltas[d_next].created_stories += deltas[d_prev].created_stories;
             }
-            this.build_charts(deltas);
+            this.build_charts(deltas, initiative);
           },
 
-          build_charts: function(deltas) {
+          build_charts: function(deltas, initiative) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
@@ -359,11 +364,11 @@
             var series_pts = [];
             var series_stories = [];
             var released_config = {
-              name: '2016 Q4',
+              name: 'Released',
               color: '#0000ff'
             };
             var created_config = {
-              name: '2016 Q4 Scope',
+              name: 'Planned',
               color: '#0000ff',
               dashStyle: 'Dot'
             };
@@ -433,7 +438,7 @@
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Points released for features this quarter' },
+                  title: { text: 'Points released this quarter for ' + initiative.FormattedID + ': ' + initiative.Name },
                   yAxis: { 
                     title: { text: 'Total points' },
                     min: 0
@@ -456,7 +461,7 @@
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Stories released for features this quarter' },
+                  title: { text: 'Stories released this quarter for ' + initiative.FormattedID + ': ' + initiative.Name },
                   yAxis: {
                     title: { text: 'Total stories' },
                     min: 0
