@@ -104,13 +104,13 @@
                   this.fetch_committed_features(release_names, features, release_lookups);
                 } else {
                   //this.fetch_stories(features, [], release_lookups);
-                  this.fetch_unscheduled_features(features, release_lookups);
+                  this.fetch_unscheduled_features(features, release_lookups, 0, []);
                 }
               }
             });
           },
 
-          fetch_unscheduled_features: function(features, release_lookups) {
+          fetch_unscheduled_features: function(features, release_lookups, index, unsched_features) {
             this._mask.msg = 'Fetching unscheduled features...';
             this._mask.show();
             var that = this;
@@ -126,7 +126,7 @@
                 {
                   property: 'LastUpdateDate',
                   operator: '>=',
-                  value: that.releases[0].start_date
+                  value: that.releases[index].start_date
                 }
               ]
             }, this);
@@ -136,13 +136,22 @@
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-                this.fetch_unschedule_dates(features, release_lookups, records);
+
+                if (operation.wasSuccessful()) {
+                  unsched_features = unsched_features.concat(records);
+                }
+
+                if (index + 1 < that.releases.length) {
+                  that.fetch_unscheduled_features(features, release_lookups, index + 1, unsched_features);
+                } else {
+                  that.fetch_unschedule_dates(features, release_lookups, unsched_features);
+                }
               }
             });
           },
 
-          fetch_unschedule_dates(features, release_lookups, unsched_rhoids) {
-            this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_rhoids.length + ' features left)';
+          fetch_unschedule_dates(features, release_lookups, unsched_features) {
+            this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_features.length + ' features left)';
             this._mask.show();
             var that = this;
 
@@ -152,7 +161,7 @@
               filters: [
                 {
                   property: 'RevisionHistory.ObjectID',
-                  value: unsched_rhoids[0].get('RevisionHistory')
+                  value: unsched_features[0].get('RevisionHistory')
                     ._ref.split('/').reverse()[0]
                 }
               ],
@@ -173,16 +182,16 @@
                   records.filter(function(r) {
                     return r.get('Description').match(/RELEASE removed/);
                   }).forEach(function(r) {
-                    release_lookups[unsched_rhoids[0].get('Name')] = 
+                    release_lookups[unsched_features[0].get('Name')] = 
                       r.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
-                    that.drops[unsched_rhoids[0].get('ObjectID')] = 
+                    that.drops[unsched_features[0].get('ObjectID')] = 
                       r.get('CreationDate').toDateString();
                   });
                 }
 
-                features.push(unsched_rhoids.shift());
-                if (unsched_rhoids.length > 0) {
-                  this.fetch_unschedule_dates(features, release_lookups, unsched_rhoids);
+                features.push(unsched_features.shift());
+                if (unsched_features.length > 0) {
+                  this.fetch_unschedule_dates(features, release_lookups, unsched_features);
                 } else {
                   this.fetch_stories(features, [], release_lookups);
                 }
