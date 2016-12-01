@@ -22,7 +22,7 @@
           },
 
           onSettingsUpdate: function(settings) {
-            this.fetch_initiative(this.getContext().getTimeboxScope());
+            this.fetch_initiative(this.ts);
           },
 
           launch: function() {
@@ -34,7 +34,8 @@
             if (!this.getSettings().Initiative) {
               this.getSettings().Initiative = '/portfolioitem/initiative/44772028590';
             }
-            this.fetch_initiative(this.getContext().getTimeboxScope());
+            this.ts = this.getContext().getTimeboxScope();
+            this.fetch_initiative(this.ts);
           },
 
           onTimeboxScopeChange: function(ts) {
@@ -43,6 +44,7 @@
             });
             this._mask.show();
 
+            this.ts = ts;
             this.fetch_initiative(ts);
           },
 
