@@ -134,10 +134,9 @@
               fetch: ['Name', 'Release', 'ObjectID', 'RevisionHistory'],
               filters: [
                 {
-                  property: 'Release',
-                  // operator: '!=',
-                  // value: ts.record.raw.Name
-                  value: null
+                  property: 'Release.Name',
+                  operator: '!=',
+                  value: ts.record.raw.Name
                 },
                 {
                   property: 'Parent.FormattedID',
@@ -151,6 +150,7 @@
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
                 if (records && records.length > 0) {
                   this.fetch_unschedule_dates(features, records, initiative, ts);
                 } else {
@@ -188,19 +188,31 @@
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+                var relevant = false;
                 if (operation.wasSuccessful()) {
-                  records.filter(function(r) {
-                    return (
-                      r.get('Description').match(/RELEASE removed/)
-                      || r.get('Description').match(new RegExp('RELEASE changed from [' + ts.record.raw.Name + ']'))
-                    );
-                  }).forEach(function(r) {
-                    that.drops[unsched_features[0].get('ObjectID')] = 
-                      r.get('CreationDate').toDateString();
+                  var r_filt = records.filter(function(r) {
+                    return r.get('Description').match(new RegExp(
+                      'RELEASE (removed|changed from) \\['
+                      + ts.record.raw.Name
+                      + '\\]'
+                    ));
                   });
+                  
+                  if (r_filt.length > 0) {
+                    relevant = true;
+                    r_filt.forEach(function(r) {
+                      that.drops[unsched_features[0].get('ObjectID')] = 
+                        r.get('CreationDate').toDateString();
+                    });
+                  }
                 }
 
-                features.push(unsched_features.shift());
+                if (relevant) {
+                  features.push(unsched_features.shift());
+                } else {
+                  unsched_features.shift();
+                }
+
                 if (unsched_features.length > 0) {
                   this.fetch_unschedule_dates(features, unsched_features, initiative, ts);
                 } else {
