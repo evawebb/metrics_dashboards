@@ -219,8 +219,8 @@
               fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature', 'CreationDate'],
               filters: [
                 {
-                  property: 'Feature.Name',
-                  value: features[0].get('Name')
+                  property: 'Feature.ObjectID',
+                  value: features[0].get('ObjectID')
                 }
               ]
             }, this);

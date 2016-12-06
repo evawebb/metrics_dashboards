@@ -66,15 +66,17 @@
 
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['PortfolioItem/Initiative'],
-              filters: {
-                property: 'ObjectID',
-                value: parseInt(that.getSettings().Initiative.split('/').reverse()[0])
-              }
+              // filters: {
+              //   property: 'ObjectID',
+              //   value: parseInt(that.getSettings().Initiative.split('/').reverse()[0])
+              // }
             }, this);
             store.load({
               scope: this,
               callback: function(records, operation) {
                 if (operation.wasSuccessful()) {
+                  console.log(parseInt(that.getSettings().Initiative.split('/').reverse()[0]));
+                  console.log(records);
                   that.fetch_committed_features(records[0].data, ts);
                 } else {
                   that.fetch_committed_features({
