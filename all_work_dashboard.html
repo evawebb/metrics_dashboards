@@ -242,6 +242,13 @@
               });
             });
 
+            var title_type = 'Stories';
+            if (type == 'Defect') {
+              title_type = 'Defects';
+            } else if (type == 'Both') {
+              title_type = 'Both';
+            }
+
             var chart_config = {
               chart: { type: 'line' },
               xAxis: { 
@@ -255,7 +262,7 @@
             var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
             var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
 
-            that.chart = this.add({
+            that.chart_pts = this.add({
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
@@ -263,7 +270,7 @@
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Total points accepted per quarter' },
+                  title: { text: 'Total points accepted per quarter (' + title_type + ')' },
                   yAxis: { 
                     title: { text: 'Total points' },
                     min: 0
@@ -277,19 +284,44 @@
               )
             });
 
+            that.chart_stories = this.add({
+              xtype:'rallychart',
+              loadMask: false,
+              chartData: {
+                series: series_stories.reverse()
+              },
+              chartConfig: Object.assign(
+                {
+                  title: { text: 'Total stories/defects accepted per quarter (' + title_type + ')' },
+                  yAxis: { 
+                    title: { text: 'Total artifacts' },
+                    min: 0
+                  },
+                  tooltip: {
+                    headerFormat: tooltip_header,
+                    pointFormat: tooltip_point.replace('{unit}', 'artifacts')
+                  }
+                },
+                chart_config
+              )
+            });
+
             this._mask.hide();
           },
 
           change_story_types: function(t, new_item, old_item, e) {
-            if (old_item && this.chart) {
+            if (old_item && this.chart_pts) {
               if (new_item == 'Just stories') {
-                this.remove(this.chart);
+                this.remove(this.chart_pts);
+                this.remove(this.chart_stories);
                 this.build_charts(this.deltas, 'UserStory');
               } else if (new_item == 'Just defects') {
-                this.remove(this.chart);
+                this.remove(this.chart_pts);
+                this.remove(this.chart_stories);
                 this.build_charts(this.deltas, 'Defect');
               } else {
-                this.remove(this.chart);
+                this.remove(this.chart_pts);
+                this.remove(this.chart_stories);
                 this.build_charts(this.deltas, 'Both');
               }
             }
