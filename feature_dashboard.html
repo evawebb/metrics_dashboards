@@ -103,7 +103,7 @@
                 if (release_names.length > 0) {
                   this.fetch_committed_features(release_names, features, release_lookups);
                 } else {
-                  //this.fetch_stories(features, [], release_lookups);
+                  // this.fetch_stories(features, [], release_lookups);
                   this.fetch_unscheduled_features(features, release_lookups, 0, []);
                 }
               }
@@ -133,6 +133,7 @@
             var t1 = new Date();
             store.load({
               scope: this,
+              limit: 1500,
               callback: function(records, operation) {
                 var t2 = new Date();
                 console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
@@ -216,11 +217,14 @@
             var that = this;
             var store = Ext.create('Rally.data.wsapi.artifact.Store', {
               models: ['UserStory', 'Defect'],
-              fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature', 'CreationDate'],
               filters: [
                 {
                   property: 'Feature.ObjectID',
                   value: features[0].get('ObjectID')
+                },
+                {
+                  property: 'DirectChildrenCount',
+                  value: 0
                 }
               ]
             }, this);
@@ -351,12 +355,14 @@
                 }
 
                 if (c_date && deltas[release]) {
-                  if (deltas[release][c_date]) {
-                    deltas[release][c_date].created_pts += s.get('PlanEstimate');
-                    deltas[release][c_date].created_stories += 1;
-                  } else {
-                    deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
-                    deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
+                  if (!drop || deltas[release][drop]) {
+                    if (deltas[release][c_date]) {
+                      deltas[release][c_date].created_pts += s.get('PlanEstimate');
+                      deltas[release][c_date].created_stories += 1;
+                    } else {
+                      deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
+                      deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
+                    }
                   }
 
                   if (drop && deltas[release][drop]) {
@@ -366,7 +372,7 @@
                 }
               }
             });
-            
+
             Object.keys(deltas).forEach(function(r) {
               var r_deltas = deltas[r];
               for (var i = 0; i < Object.keys(r_deltas).length - 1; i += 1) {
