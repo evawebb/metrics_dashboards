@@ -367,12 +367,14 @@
               }
 
               if (c_date) {
-                if (deltas[c_date]) {
-                  deltas[c_date].created_pts += s.get('PlanEstimate');
-                  deltas[c_date].created_stories += 1;
-                } else {
-                  deltas[Object.keys(deltas)[0]].created_pts += s.get('PlanEstimate');
-                  deltas[Object.keys(deltas)[0]].created_stories += 1;
+                if (!drop || deltas[drop]) {
+                  if (deltas[c_date]) {
+                    deltas[c_date].created_pts += s.get('PlanEstimate');
+                    deltas[c_date].created_stories += 1;
+                  } else {
+                    deltas[Object.keys(deltas)[0]].created_pts += s.get('PlanEstimate');
+                    deltas[Object.keys(deltas)[0]].created_stories += 1;
+                  }
                 }
 
                 if (drop && deltas[drop]) {
