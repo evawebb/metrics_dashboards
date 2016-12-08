@@ -344,11 +344,21 @@
                 var c_date = s.get('CreationDate').toDateString();
                 var drop = that.drops[s.get('Feature').ObjectID];
 
-                if (r_date && deltas[release][r_date]) {
+                if (
+                  r_date && deltas[release][r_date]
+                  && (
+                    !drop
+                    || (
+                      drop 
+                      && deltas[release][drop]
+                      && (new Date(drop) > new Date(r_date))
+                    )
+                  )
+                ) {
                   deltas[release][r_date].released_pts += s.get('PlanEstimate');
                   deltas[release][r_date].released_stories += 1;
 
-                  if (drop && deltas[release][drop]) {
+                  if (drop) {
                     deltas[release][drop].released_pts -= s.get('PlanEstimate');
                     deltas[release][drop].released_stories -= 1;
                   }
