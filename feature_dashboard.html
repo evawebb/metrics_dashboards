@@ -394,16 +394,33 @@
                 r_deltas[d_next].created_stories += r_deltas[d_prev].created_stories;
               }
             });
-            this.build_charts(deltas);
+            this.removeAll();
+            this.create_options(deltas);
           },
 
-          build_charts: function(deltas) {
+          create_options: function(deltas) {
+            var that = this;
+            this.add({
+              xtype: 'rallycombobox',
+              itemId: 'graph_select',
+              store: ['Total points', 'Total stories/defects'],
+              listeners: { change: {
+                fn: that.change_graph_type.bind(that)
+              }}
+            });
+
+            this.deltas = deltas;
+            this.build_charts(deltas, 'Total points');
+          },
+
+          build_charts: function(deltas, type) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
+            var points = type == 'Total points';
+
             var that = this;
-            var series_pts = [];
-            var series_stories = [];
+            var series = [];
             Object.keys(deltas).forEach(function(release) {
               var released_config = {
                 name: release,
@@ -415,109 +432,71 @@
                 dashStyle: 'Dot',
                 visible: release == that.releases[0].name
               };
-              var released_pts_data = [];
-              var created_pts_data = [];
-              var released_stories_data = [];
-              var created_stories_data = [];
+              var released_data = [];
+              var created_data = [];
 
               Object.keys(deltas[release]).forEach(function(d) {
-                released_pts_data.push({
-                  y: deltas[release][d].released_pts,
+                released_data.push({
+                  y: points ?
+                    deltas[release][d].released_pts :
+                    deltas[release][d].released_stories,
                   date: d
                 });
-                created_pts_data.push({
-                  y: deltas[release][d].created_pts,
-                  date: d
-                });
-                released_stories_data.push({
-                  y: deltas[release][d].released_stories,
-                  date: d
-                });
-                created_stories_data.push({
-                  y: deltas[release][d].created_stories,
+                created_data.push({
+                  y: points ?
+                    deltas[release][d].created_pts :
+                    deltas[release][d].created_stories,
                   date: d
                 });
               });
 
-              series_pts.push(Object.assign(
-                { data: released_pts_data },
+              series.push(Object.assign(
+                { data: released_data },
                 released_config
               ));
-              series_pts.push(Object.assign(
-                { data: created_pts_data },
-                created_config
-              ));
-              series_stories.push(Object.assign(
-                { data: released_stories_data },
-                released_config
-              ));
-              series_stories.push(Object.assign(
-                { data: created_stories_data },
+              series.push(Object.assign(
+                { data: created_data },
                 created_config
               ));
             });
 
-            this.removeAll();
             var chart_config = {
               chart: { type: 'line' },
+              title: { text: (points ? 'Points' : 'Stories/defects') + ' released for features this quarter' },
               xAxis: { 
                 title: { text: 'Days into the quarter' }
+              },
+              yAxis: { 
+                title: { text: 'Total ' + (points ? 'points' : 'artifacts') },
+                min: 0
+              },
+              tooltip: {
+                headerFormat: '<span style="font-size: 10px">{series.name}</span><br/>',
+                pointFormat: '<b>{point.y} {unit}</b><br />on {point.date}'.replace('{unit}', points ? 'points' : 'artifacts')
               },
               plotOptions: { line: {
                 lineWidth: 3,
                 marker: { enabled: false }
               }}
             };
-            var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
-            var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
 
-            // Add the velocity chart.
-            this.add({
+            this.chart = this.add({
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
-                series: series_pts.reverse()
+                series: series.reverse()
               },
-              chartConfig: Object.assign(
-                {
-                  title: { text: 'Points released for features this quarter' },
-                  yAxis: { 
-                    title: { text: 'Total points' },
-                    min: 0
-                  },
-                  tooltip: {
-                    headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'points')
-                  }
-                },
-                chart_config
-              )
+              chartConfig: chart_config
             });
-            
-            // Add the throughput chart.
-            this.add({
-              xtype: 'rallychart',
-              loadMask: false,
-              chartData: {
-                series: series_stories.reverse()
-              },
-              chartConfig: Object.assign(
-                {
-                  title: { text: 'Stories released for features this quarter' },
-                  yAxis: {
-                    title: { text: 'Total stories' },
-                    min: 0
-                  },
-                  tooltip: {
-                    headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'stories')
-                  }
-                },
-                chart_config
-              )
-            });
-
+             
             this._mask.hide();
+          },
+
+          change_graph_type: function(t, new_item, old_item, e) {
+            if (old_item && this.chart) {
+              this.remove(this.chart);
+              this.build_charts(this.deltas, new_item);
+            }
           }
         });
 

@@ -392,16 +392,35 @@
               deltas[d_next].created_pts += deltas[d_prev].created_pts;
               deltas[d_next].created_stories += deltas[d_prev].created_stories;
             }
-            this.build_charts(deltas, initiative);
+            this.removeAll();
+            this.create_options(deltas, initiative);
           },
 
-          build_charts: function(deltas, initiative) {
+          create_options: function(deltas, initiative) {
+            var that = this;
+            this.add({
+              xtype: 'rallycombobox',
+              itemId: 'graph_select',
+              store: ['Total points', 'Total stories/defects'],
+              listeners: { change: {
+                fn: that.change_graph_type.bind(that)
+              }}
+            });
+            this.add_settings_link();
+
+            this.deltas = deltas;
+            this.initiative = initiative;
+            this.build_charts(deltas, initiative, 'Total points');
+          },
+
+          build_charts: function(deltas, initiative, type) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
+            var points = type == 'Total points';
+
             var that = this;
-            var series_pts = [];
-            var series_stories = [];
+            var series = [];
             var released_config = {
               name: 'Released',
               color: '#0000ff'
@@ -411,44 +430,30 @@
               color: '#0000ff',
               dashStyle: 'Dot'
             };
-            var released_pts_data = [];
-            var created_pts_data = [];
-            var released_stories_data = [];
-            var created_stories_data = [];
+            var released_data = [];
+            var created_data = [];
 
             Object.keys(deltas).forEach(function(d) {
-              released_pts_data.push({
-                y: deltas[d].released_pts,
+              released_data.push({
+                y: points ?
+                  deltas[d].released_pts :
+                  deltas[d].released_stories,
                 date: d
               });
-              created_pts_data.push({
-                y: deltas[d].created_pts,
-                date: d
-              });
-              released_stories_data.push({
-                y: deltas[d].released_stories,
-                date: d
-              });
-              created_stories_data.push({
-                y: deltas[d].created_stories,
+              created_data.push({
+                y: points ?
+                  deltas[d].created_pts :
+                  deltas[d].created_stories,
                 date: d
               });
             });
 
-            series_pts.push(Object.assign(
-              { data: released_pts_data },
+            series.push(Object.assign(
+              { data: released_data },
               released_config
             ));
-            series_pts.push(Object.assign(
-              { data: created_pts_data },
-              created_config
-            ));
-            series_stories.push(Object.assign(
-              { data: released_stories_data },
-              released_config
-            ));
-            series_stories.push(Object.assign(
-              { data: created_stories_data },
+            series.push(Object.assign(
+              { data: created_data },
               created_config
             ));
 
@@ -465,49 +470,22 @@
             var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
             var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
 
-            this.removeAll();
-            this.add_settings_link();
-
-            // Add the velocity chart.
-            this.add({
+            this.chart = this.add({
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
-                series: series_pts.reverse()
+                series: series.reverse()
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Points released for ' + initiative.FormattedID + ': ' + initiative.Name },
+                  title: { text: (points ? 'Points' : 'Stories/defects') + ' released for ' + initiative.FormattedID + ': ' + initiative.Name },
                   yAxis: { 
-                    title: { text: 'Total points' },
+                    title: { text: 'Total ' + (points ? 'points' : 'artifacts')},
                     min: 0
                   },
                   tooltip: {
                     headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'points')
-                  }
-                },
-                chart_config
-              )
-            });
-            
-            // Add the throughput chart.
-            this.add({
-              xtype: 'rallychart',
-              loadMask: false,
-              chartData: {
-                series: series_stories.reverse()
-              },
-              chartConfig: Object.assign(
-                {
-                  title: { text: 'Stories released for ' + initiative.FormattedID + ': ' + initiative.Name },
-                  yAxis: {
-                    title: { text: 'Total stories' },
-                    min: 0
-                  },
-                  tooltip: {
-                    headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'stories')
+                    pointFormat: tooltip_point.replace('{unit}', points ? 'points' : 'artifacts')
                   }
                 },
                 chart_config
@@ -515,6 +493,13 @@
             });
 
             this._mask.hide();
+          },
+
+          change_graph_type: function(t, new_item, old_item, e) {
+            if (old_item && this.chart) {
+              this.remove(this.chart);
+              this.build_charts(this.deltas, this.initiative, new_item);
+            }
           },
 
           add_settings_link: function() {

@@ -194,7 +194,7 @@
             var that = this;
             this.add({
               xtype: 'rallycombobox',
-              itemId: 'test',
+              itemId: 'artifact_select',
               store: ['Just stories', 'Just defects', 'Both'],
               listeners: {
                 change: {
@@ -202,50 +202,53 @@
                 }
               }
             });
+            this.add({
+              xtype: 'rallycombobox',
+              itemId: 'graph_select',
+              store: ['Total points', 'Total stories/defects'],
+              listeners: { change: {
+                fn: that.change_graph_type.bind(that)
+              }}
+            });
 
             this.deltas = deltas;
+            this.artifact_type = 'UserStory';
+            this.graph_type = 'Total points';
 
-            this.build_charts(deltas, 'UserStory');
+            this.build_charts(deltas, this.graph_type, this.artifact_type);
           },
 
-          build_charts: function(deltas, type) {
+          build_charts: function(deltas, graph_type, artifact_type) {
             this._mask.msg = 'Building chart...';
             this._mask.show();
 
+            var points = graph_type == 'Total points';
+
             var that = this;
-            var series_pts = [];
-            var series_stories = [];
+            var series = [];
             Object.keys(deltas).forEach(function(release) {
-              var pts_data = [];
-              var stories_data = [];
+              var data = [];
 
               Object.keys(deltas[release]).forEach(function(d) {
-                pts_data.push({
-                  y: deltas[release][d].accepted_pts[type],
-                  date: d
-                });
-                stories_data.push({
-                  y: deltas[release][d].accepted_stories[type],
+                data.push({
+                  y: points ?
+                    deltas[release][d].accepted_pts[artifact_type] :
+                    deltas[release][d].accepted_stories[artifact_type],
                   date: d
                 });
               });
 
-              series_pts.push({
+              series.push({
                 name: release,
                 color: that.colors[release],
-                data: pts_data
-              });
-              series_stories.push({
-                name: release,
-                color: that.colors[release],
-                data: stories_data
+                data: data
               });
             });
 
             var title_type = 'Stories';
-            if (type == 'Defect') {
+            if (artifact_type == 'Defect') {
               title_type = 'Defects';
-            } else if (type == 'Both') {
+            } else if (artifact_type == 'Both') {
               title_type = 'Both';
             }
 
@@ -262,44 +265,22 @@
             var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
             var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';
 
-            that.chart_pts = this.add({
+            that.chart = this.add({
               xtype: 'rallychart',
               loadMask: false,
               chartData: {
-                series: series_pts.reverse()
+                series: series.reverse()
               },
               chartConfig: Object.assign(
                 {
-                  title: { text: 'Total points accepted per quarter (' + title_type + ')' },
+                  title: { text: (points ? 'Points' : 'Stories/defects') + ' accepted per quarter (' + title_type + ')' },
                   yAxis: { 
-                    title: { text: 'Total points' },
+                    title: { text: 'Total ' + (points ? 'points' : 'artifacts') },
                     min: 0
                   },
                   tooltip: {
                     headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'points')
-                  }
-                },
-                chart_config
-              )
-            });
-
-            that.chart_stories = this.add({
-              xtype:'rallychart',
-              loadMask: false,
-              chartData: {
-                series: series_stories.reverse()
-              },
-              chartConfig: Object.assign(
-                {
-                  title: { text: 'Total stories/defects accepted per quarter (' + title_type + ')' },
-                  yAxis: { 
-                    title: { text: 'Total artifacts' },
-                    min: 0
-                  },
-                  tooltip: {
-                    headerFormat: tooltip_header,
-                    pointFormat: tooltip_point.replace('{unit}', 'artifacts')
+                    pointFormat: tooltip_point.replace('{unit}', points ? 'points' : 'artifacts')
                   }
                 },
                 chart_config
@@ -310,20 +291,28 @@
           },
 
           change_story_types: function(t, new_item, old_item, e) {
-            if (old_item && this.chart_pts) {
+            if (old_item && this.chart) {
               if (new_item == 'Just stories') {
-                this.remove(this.chart_pts);
-                this.remove(this.chart_stories);
-                this.build_charts(this.deltas, 'UserStory');
+                this.artifact_type = 'UserStory';
+                this.remove(this.chart);
+                this.build_charts(this.deltas, this.graph_type, 'UserStory');
               } else if (new_item == 'Just defects') {
-                this.remove(this.chart_pts);
-                this.remove(this.chart_stories);
-                this.build_charts(this.deltas, 'Defect');
+                this.artifact_type = 'Defect';
+                this.remove(this.chart);
+                this.build_charts(this.deltas, this.graph_type, 'Defect');
               } else {
-                this.remove(this.chart_pts);
-                this.remove(this.chart_stories);
-                this.build_charts(this.deltas, 'Both');
+                this.artifact_type = 'Both';
+                this.remove(this.chart);
+                this.build_charts(this.deltas, this.graph_type, 'Both');
               }
+            }
+          },
+
+          change_graph_type: function(t, new_item, old_item, e) {
+            if (old_item && this.chart) {
+              this.graph_type = new_item;
+              this.remove(this.chart);
+              this.build_charts(this.deltas, new_item, this.artifact_type);
             }
           }
         });
