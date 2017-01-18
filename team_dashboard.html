@@ -448,8 +448,7 @@
             // Also filter out artifacts that lack a StartedDate.
             var filt_stories = stories.filter(function(s) {
               if (
-                s[that.cycle_time_end_state + 'Date']
-                && !(
+                !(
                   s._type == 'C'
                   && !s.Resolution.match(/[cC]hange$/)
                 )
