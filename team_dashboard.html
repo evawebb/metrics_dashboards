@@ -33,7 +33,9 @@
             'InProgressDate',
             'AcceptedDate'
           ],
-          columns: {
+          cycle_time_start_state: 'Started',
+          cycle_time_end_state: 'Released',
+          columns_big: {
             'FormattedID':      { key: 'FormattedID',    center: true },
             'Type':             { key: '_type',          center: true },
             'Name':             { key: 'Name',           center: false },
@@ -49,13 +51,20 @@
             'Cycle Time':       { key: 'CycleTime',      center: true },
             'Resolution':       { key: 'Resolution',     center: false }
           },
+          columns_stats: {
+            'Type':                 { key: 'name' },
+            'Accepted Throughput':  { key: 'throughput_a',  label: true },
+            'Released Throughput':  { key: 'throughput_r',  label: true, bold: true },
+            'Cycle Time Avg.':      { key: 'cycle_time',    time: true, bold: true },
+            'Cycle Time Median':    { key: 'median_ct',     time: true, bold: true },
+            'Skipped':              { key: 'skipped',       label: true },
+            'Weekly Released Avg.': { key: 'weekly_r',      label: true }
+          },
           months: [
             'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
           ],
           complete_dates: true,
-          cycle_time_start_state: 'Started',
-          cycle_time_end_state: 'Released',
           cycle_time_threshold: 25,
 
           getUserSettingsFields: function() {
@@ -561,23 +570,35 @@
             var that = this;
 
             // The table-wide statistics.
-            var stats = '<br /><table><thead><tr><th>Type</th>' +
-              '<th title="Number of stories or defects accepted in this quarter.">Accepted Throughput</th>' +
-              '<th title="Number of stories or defects released in this quarter.">Released Throughput</th>' +
-              '<th title="Average number of stories or defects released each week this quarter.">Weekly Released Avg.</th>' +
-              '<th title="Average cycle time (from ' + this.cycle_time_start_state + ' to ' + this.cycle_time_end_state + ') for stories or defects this quarter.">Cycle Time Avg.</th>' +
-              '<th title="Median cycle time (from ' + this.cycle_time_start_state + ' to ' + this.cycle_time_end_state + ') for stories or defects this quarter.">Cycle Time Median</th>' +
-              '<th title="Number of stories or defects that were excluded from the statistics in this table. This includes artifacts that lack a \'Started\' date.">Skipped</th>' +
-              '</tr></thead>';
+            var stats = '<br /><div class="center bold">Throughput Table</div>';
+            stats += '<table class="center"><thead><tr>';
+            Object.keys(that.columns_stats).forEach(function(k) {
+              stats += '<th>';
+              stats += k;
+              stats += '</th>';
+            });
+            stats += '</tr></thead>';
             Object.keys(total_stats).forEach(function(t) {
               var ts = total_stats[t];
-              stats += '<tr><td class="center">' + ts.name + '</td>';
-              stats += '<td class="center">' + that.label_datum(ts.throughput_a.toLocaleString(), t) + '</td>';
-              stats += '<td class="center">' + that.label_datum(ts.throughput_r.toLocaleString(), t) + '</td>';
-              stats += '<td class="center">' + that.label_datum(ts.weekly_r.toLocaleString(), t) + '</td>';
-              stats += '<td class="center">' + that.format_ms(ts.cycle_time, 'ceil') + '</td>';
-              stats += '<td class="center">' + that.format_ms(ts.median_ct, 'ceil') + '</td>';
-              stats += '<td class="center">' + that.label_datum(ts.skipped, t) + '</td>';
+              stats += '<tr>';
+
+              Object.keys(that.columns_stats).forEach(function(k) {
+                var d = ts[that.columns_stats[k].key];
+                stats += '<td class="center' +
+                  (that.columns_stats[k].bold ?
+                    ' bold"' :
+                    '"') +
+                  '>';
+                if (that.columns_stats[k].label) {
+                  stats += that.label_datum(d.toLocaleString(), t);
+                } else if (that.columns_stats[k].time) {
+                  stats += that.format_ms(d, 'ceil');
+                } else {
+                  stats += d;
+                }
+                stats += '</td>';
+              });
+
               stats += '</tr>';
             });
             stats += '</table>';
@@ -597,7 +618,7 @@
 
             // The table.
             var table = '<table style="display: none" id="big_table"><thead><tr><th>' +
-              Object.keys(this.columns).join('</th><th>') +
+              Object.keys(this.columns_big).join('</th><th>') +
               '</th></tr></thead>';
             stories.forEach(function(story) {
               table += that.build_table_row(story);
@@ -616,14 +637,14 @@
             var row = '<tr>';
             var that = this;
 
-            Object.keys(this.columns).forEach(function(col) {
-              var datum = data[that.columns[col].key];
-              var center = that.columns[col].center;
+            Object.keys(this.columns_big).forEach(function(col) {
+              var datum = data[that.columns_big[col].key];
+              var center = that.columns_big[col].center;
               var filled = false;
               if (!datum) {
                 datum = '';
-              } else if (that.columns[col].date) {
-                filled = data[that.columns[col].key + 'Filled'];
+              } else if (that.columns_big[col].date) {
+                filled = data[that.columns_big[col].key + 'Filled'];
                 datum = datum.toDateString();
               }
 
@@ -846,10 +867,22 @@
 
       td, th {
         border: 1px solid black;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      th {
+        font-weight: bold;
+      }
+
+      .bold {
+        font-weight: bold;
       }
 
       .center {
         text-align: center;
+        margin-left: auto;
+        margin-right: auto;
       }
 
       .filled {
