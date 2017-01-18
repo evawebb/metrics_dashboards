@@ -444,23 +444,13 @@
               S: { name: 'Stories', skipped: 0 }
             };
 
-            // Filter out CV Defects that were not resolved.
-            // Also filter out artifacts that lack a StartedDate.
+            // Filter out artifacts that lack a StartedDate.
             var filt_stories = stories.filter(function(s) {
-              if (
-                !(
-                  s._type == 'C'
-                  && !s.Resolution.match(/[cC]hange$/)
-                )
-              ) {
-                if (s.Skipped) {
-                  total_stats[s._type].skipped += 1;
-                  return false;
-                } else {
-                  return true;
-                }
-              } else {
+              if (s.Skipped) {
+                total_stats[s._type].skipped += 1;
                 return false;
+              } else {
+                return true;
               }
             });
 
