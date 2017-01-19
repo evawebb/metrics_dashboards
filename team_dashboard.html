@@ -54,11 +54,11 @@
           columns_stats: {
             'Type':                 { key: 'name' },
             'Accepted Throughput':  { key: 'throughput_a',  label: true },
-            'Released Throughput':  { key: 'throughput_r',  label: true, bold: true },
-            'Cycle Time Avg.':      { key: 'cycle_time',    time: true, bold: true },
-            'Cycle Time Median':    { key: 'median_ct',     time: true, bold: true },
-            'Skipped':              { key: 'skipped',       label: true },
-            'Weekly Released Avg.': { key: 'weekly_r',      label: true }
+            'Released Throughput':  { key: 'throughput_r',  label: true, highlight: true },
+            'Cycle Time Avg.':      { key: 'cycle_time',    time: true, highlight: true },
+            'Cycle Time Median':    { key: 'median_ct',     time: true, highlight: true },
+            'Weekly Released Avg.': { key: 'weekly_r',      label: true },
+            'Skipped':              { key: 'skipped',       label: true }
           },
           months: [
             'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
@@ -570,10 +570,10 @@
             var that = this;
 
             // The table-wide statistics.
-            var stats = '<br /><div class="center bold">Throughput Table</div>';
+            var stats = '<br /><div class="center title">Throughput Table</div>';
             stats += '<table class="center"><thead><tr>';
             Object.keys(that.columns_stats).forEach(function(k) {
-              stats += '<th>';
+              stats += '<th class="bold">';
               stats += k;
               stats += '</th>';
             });
@@ -585,8 +585,8 @@
               Object.keys(that.columns_stats).forEach(function(k) {
                 var d = ts[that.columns_stats[k].key];
                 stats += '<td class="center' +
-                  (that.columns_stats[k].bold ?
-                    ' bold"' :
+                  (that.columns_stats[k].highlight ?
+                    ' highlight"' :
                     '"') +
                   '>';
                 if (that.columns_stats[k].label) {
@@ -871,12 +871,18 @@
         padding-right: 10px;
       }
 
-      th {
+      .title {
         font-weight: bold;
+        font-size: 14pt;
       }
 
       .bold {
         font-weight: bold;
+        background-color: #e0e0e0;
+      }
+
+      .highlight {
+        font-size: 10pt;
       }
 
       .center {
