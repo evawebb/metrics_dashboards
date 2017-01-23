@@ -74,13 +74,10 @@
             store.load({
               scope: this,
               callback: function(records, operation) {
-                if (operation.wasSuccessful()) {
+                if (operation.wasSuccessful() && records[0]) {
                   that.fetch_committed_features(records[0].data, ts);
                 } else {
-                  that.fetch_committed_features({
-                    FormattedID: 'I4099',
-                    Name: 'Personalized Navigation v1'
-                  }, ts);
+                  that.haltEarly('Problem loading initiative.');
                 }
               }
             });
