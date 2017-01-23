@@ -112,7 +112,6 @@
                 if (operation.wasSuccessful()) {
                   if (records.length > 0) {
                     that.fetch_unscheduled_features(records, initiative, ts);
-                    //that.fetch_stories(records, [], initiative, ts);
                   } else {
                     that.haltEarly('No features found.');
                   }

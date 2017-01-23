@@ -112,7 +112,6 @@
               msg: 'Please wait...'
             });
             this._mask.show();
-            this.project_oid = this.getContext().getProject().ObjectID;
             this.fetch_iterations(this.getContext().getTimeboxScope());
           },
 
@@ -236,7 +235,7 @@
             var that = this;
             var t1 = new Date();
             var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-              fetch: ['ScheduleState', '_PreviousValues.ScheduleState', 'Project', '_PreviousValues.Project', '_ValidFrom', '_ValidTo'],
+              fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom'],
               hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
               filters: [
                 {
@@ -255,13 +254,10 @@
                     data.filter(function(d) {
                       return (
                         (
-                          (
-                            d.get('_PreviousValues.ScheduleState')
-                            && d.get('_PreviousValues.ScheduleState').length > 0
-                          )
-                          || d.get('_PreviousValues.ScheduleState') === null
+                          d.get('_PreviousValues.ScheduleState')
+                          && d.get('_PreviousValues.ScheduleState').length > 0
                         )
-                        && d.get('Project') == that.project_oid
+                        || d.get('_PreviousValues.ScheduleState') === null
                       );
                     }).forEach(function(d) {
                       hashed_stories[d.get('ObjectID')].data.Revisions.push({
@@ -468,12 +464,18 @@
 
             // Throughput.
             Object.keys(total_stats).forEach(function(t) {
-              total_stats[t].throughput_r = filt_stories.filter(function(s) {
-                return (s._type == t && s.ReleasedDate);
-              }).length;
-              total_stats[t].throughput_a = filt_stories.filter(function(s) {
-                return (s._type == t && (s.AcceptedDate || s.ReleasedDate));
-              }).length;
+              total_stats[t].throughput_r = 0;
+              total_stats[t].throughput_a = 0;
+              filt_stories.forEach(function(s) {
+                if (s._type == t) {
+                  if (s.ReleasedDate) {
+                    total_stats[t].throughput_r += 1;
+                    total_stats[t].throughput_a += 1;
+                  } else if (s.AcceptedDate) {
+                    total_stats[t].throughput_a += 1;
+                  }
+                }
+              });
             });
 
             // Weekly released.
