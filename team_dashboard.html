@@ -31,7 +31,8 @@
             'Revisions',
             'CreationDate',
             'InProgressDate',
-            'AcceptedDate'
+            'AcceptedDate',
+            'Feature'
           ],
           cycle_time_start_state: 'Started',
           cycle_time_end_state: 'Released',
@@ -537,7 +538,7 @@
             this.build_settings_link();
             this.build_stats_table(total_stats);
             this.build_table(stories);
-            this.build_plot(stories);
+            this.build_plot(stories, 'asdf');
             this.build_flow_dia(stories);
             this._mask.hide();
           },
@@ -668,28 +669,51 @@
           },
 
           // Make a scatter plot.
-          build_plot: function(stories) {
+          build_plot: function(stories, mode = 'Artifact type') {
             var that = this;
-            var data = {
-              series: [
-                {
-                  name: 'Stories',
-                  data: []
-                },
-                {
-                  name: 'Defects',
-                  data: []
-                },
-                {
-                  name: 'CV Defects',
-                  data: []
+            var by_artifact = (mode == 'Artifact type');
+
+            var data, indices;
+            if (by_artifact) {
+              data = {
+                series: [
+                  {
+                    name: 'Stories',
+                    data: []
+                  },
+                  {
+                    name: 'Defects',
+                    data: []
+                  },
+                  {
+                    name: 'CV Defects',
+                    data: []
+                  }
+                ]
+              };
+              var indices = ['S', 'D', 'C'];
+            } else {
+              indices = ['No feature'];
+              stories.forEach(function(s) {
+                if (s.Feature && !indices.includes(s.Feature.Name)) {
+                  indices.push(s.Feature.Name);
+                } else if (!s.Feature) {
+                  s.Feature = { Name: 'No feature' };
                 }
-              ]
-            };
-            var indices = ['S', 'D', 'C'];
+              });
+              data = { series: [] };
+              indices.forEach(function(i) {
+                data.series.push({
+                  name: i,
+                  data: []
+                });
+              });
+            }
             stories.forEach(function(s) {
-              data.series[indices.indexOf(s._type)].data.push(s);
+              var index = by_artifact ? s._type : s.Feature.Name;
+              data.series[indices.indexOf(index)].data.push(s);
             });
+            console.log(data);
             var omitted = 0;
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
