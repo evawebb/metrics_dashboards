@@ -165,8 +165,11 @@
                     return r.get('StartDate').getTime() < Date.now();
                   }).length;
 
-                  var iterations = records.map(function(r) {
-                    return r.get('Name');
+                  var iterations = [];
+                  records.forEach(function(r) {
+                    if (!iterations.includes(r.get('Name'))) {
+                      iterations.push(r.get('Name'));
+                    }
                   });
 
                   if (iterations.length > 0) {
