@@ -195,7 +195,7 @@
             this.add({
               xtype: 'rallycombobox',
               itemId: 'artifact_select',
-              fieldLabel: 'Y-axis:',
+              fieldLabel: 'Artifact type(s):',
               store: ['Just stories', 'Just defects', 'Both'],
               listeners: {
                 change: {
@@ -206,6 +206,7 @@
             this.add({
               xtype: 'rallycombobox',
               itemId: 'graph_select',
+              fieldLabel: 'Y-axis:',
               store: ['Total points', 'Total stories/defects'],
               listeners: { change: {
                 fn: that.change_graph_type.bind(that)
