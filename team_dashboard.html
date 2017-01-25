@@ -791,6 +791,7 @@
 
           // Build a cumulative flow diagram.
           build_flow_dia: function(stories) {
+            var that = this;
             var labels = [
               // 'CreatedDate',
               // 'DefinedDate',
@@ -826,7 +827,7 @@
                     if (prev_state) {
                       totals[s[dt].toDateString()][prev_state] -= 1;
                     }
-                  } else {
+                  } else if (s[dt] < new Date(that.start_date)) {
                     start[dt] += 1;
                     if (prev_state) {
                       start[prev_state] -= 1;
