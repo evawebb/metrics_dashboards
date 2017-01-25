@@ -104,6 +104,7 @@
             this.add({
               xtype: 'rallycombobox',
               itemId: 'mode_select',
+              fieldLabel: 'Y-axis:',
               store: ['Separate', 'Combined'],
               listeners: { change: {
                 fn: that.change_graph_mode.bind(that)

@@ -535,10 +535,11 @@
             });
 
             this.removeAll();
-            this.build_settings_link();
+            this.add_settings_link();
             this.build_stats_table(total_stats);
             this.build_table(stories);
-            this.build_plot(stories, 'asdf');
+            this.create_options(stories);
+            this.build_plot(stories);
             this.build_flow_dia(stories);
             this._mask.hide();
           },
@@ -560,14 +561,19 @@
             }
           },
 
-          // Add a link that opens the app settings.
-          build_settings_link: function() {
+          create_options: function(stories) {
+            var that = this;
             this.add({
-              xtype: 'component',
-              html: '<a href="javascript:;" onClick="' +
-                    'Rally.getApp().showSettings()' +
-                    '">Modify app settings</a><br />'
+              xtype: 'rallycombobox',
+              itemId: 'bubble_select',
+              fieldLabel: 'Color bubbles by:',
+              store: ['Artifact type', 'Feature'],
+              listeners: { change: {
+                fn: that.change_bubble_type.bind(that)
+              }}
             });
+
+            this.stories = stories;
           },
 
           // Construct the HTML table to display the calculated
@@ -579,7 +585,7 @@
             var stats = '<br /><div class="center title">Throughput Table</div>';
             stats += '<table class="center"><thead><tr>';
             Object.keys(that.columns_stats).forEach(function(k) {
-              stats += '<th class="bold">';
+              stats += '<th class="bold tablecell">';
               stats += k;
               stats += '</th>';
             });
@@ -590,7 +596,7 @@
 
               Object.keys(that.columns_stats).forEach(function(k) {
                 var d = ts[that.columns_stats[k].key];
-                stats += '<td class="center' +
+                stats += '<td class="tablecell center' +
                   (that.columns_stats[k].highlight ?
                     ' highlight"' :
                     '"') +
@@ -623,13 +629,13 @@
             var button = '<br /><a id="toggle_link" href="javascript:;" onclick="toggle_big_table()">Show all stories</a><br />';
 
             // The table.
-            var table = '<table style="display: none" id="big_table"><thead><tr><th>' +
-              Object.keys(this.columns_big).join('</th><th>') +
+            var table = '<table style="display: none" id="big_table"><thead><tr><th class="tablecell">' +
+              Object.keys(this.columns_big).join('</th><th class="tablecell">') +
               '</th></tr></thead>';
             stories.forEach(function(story) {
               table += that.build_table_row(story);
             });
-            table += '</table>';
+            table += '</table><hr />';
 
             this.add({
               xtype: 'component',
@@ -654,7 +660,7 @@
                 datum = datum.toDateString();
               }
 
-              row += ('<td class="' +
+              row += ('<td class="tablecell ' +
                 (center ? 'center ' : '') +
                 (filled ? 'filled ' : '') +
                 '" ' +
@@ -713,7 +719,6 @@
               var index = by_artifact ? s._type : s.Feature.Name;
               data.series[indices.indexOf(index)].data.push(s);
             });
-            console.log(data);
             var omitted = 0;
             data.series.forEach(function(c) {
               c.data = c.data.map(function(s) {
@@ -745,7 +750,7 @@
               });
             });
 
-            var chart = this.add({
+            this.bubble_chart = this.insert(4, {
               xtype: 'rallychart',
               loadMask: false,
               chartData: data,
@@ -882,6 +887,23 @@
                 }
               }
             });
+          },
+
+          change_bubble_type: function(t, new_item, old_item, e) {
+            if (old_item && this.bubble_chart) {
+              this.remove(this.bubble_chart);
+              this.build_plot(this.stories, new_item);
+            }
+          },
+
+          // Add a link that opens the app settings.
+          add_settings_link: function() {
+            this.add({
+              xtype: 'component',
+              html: '<a href="javascript:;" onClick="' +
+                    'Rally.getApp().showSettings()' +
+                    '">Modify app settings</a><br />'
+            });
           }
         });
 
@@ -894,7 +916,7 @@
         border-collapse: collapse;
       }
 
-      td, th {
+      .tablecell {
         border: 1px solid black;
         padding-left: 10px;
         padding-right: 10px;
