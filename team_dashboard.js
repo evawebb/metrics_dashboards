@@ -731,7 +731,7 @@ Ext.define('ZzacksTeamDashboardApp', {
       });
     });
 
-    this.bubble_chart = this.insert(4, {
+    this.bubble_chart = this.insert(5, {
       xtype: 'rallychart',
       loadMask: false,
       chartData: data,
@@ -880,6 +880,10 @@ Ext.define('ZzacksTeamDashboardApp', {
 
   // Add a link that opens the app settings.
   add_settings_link: function() {
+    this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+    });
     this.add({
       xtype: 'component',
       html: '<a href="javascript:;" onClick="' +

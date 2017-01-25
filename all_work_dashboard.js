@@ -186,6 +186,10 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   create_options: function(deltas) {
     var that = this;
     this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+    });
+    this.add({
       xtype: 'rallycombobox',
       itemId: 'artifact_select',
       fieldLabel: 'Artifact type(s):',

@@ -95,6 +95,10 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
   create_options: function(counts) {
     var that = this;
     this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+    });
+    this.add({
       xtype: 'rallycombobox',
       itemId: 'mode_select',
       fieldLabel: 'Combine stories & defects?',

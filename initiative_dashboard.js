@@ -387,6 +387,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
   create_options: function(deltas, initiative) {
     var that = this;
+    this.add_settings_link();
     this.add({
       xtype: 'rallycombobox',
       itemId: 'graph_select',
@@ -396,7 +397,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         fn: that.change_graph_type.bind(that)
       }}
     });
-    this.add_settings_link();
 
     this.deltas = deltas;
     this.initiative = initiative;
@@ -493,6 +493,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   add_settings_link: function() {
+    this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+    });
     this.add({
       xtype: 'component',
       html: '<a href="javascript:;" onClick="' +
