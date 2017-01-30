@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+      function toggle_big_table() {
+        var t = document.getElementById("big_table");
+        var l = document.getElementById("toggle_link");
+        if (t.style.display == "inline") {
+          t.style.display = "none";
+          l.innerHTML = "Show all stories";
+        } else {
+          t.style.display = "inline";
+          l.innerHTML = "Hide all stories";
+        }
+      }
+
+      function load_menu() {
+        var b = document.getElementById("the_body");
+        b.innerHTML = "<div> \
+          <ul> \
+            <li><a  \
+              href=\"javascript:void(0)\"  \
+              onclick=\"Rally.launchApp('ZzacksTeamDashboardApp')\" \
+            >Team Dashboard</a></li> \
+            <li><a  \
+              href=\"javascript:void(0)\"  \
+              onclick=\"Rally.launchApp('ZzacksFeatureDashboardApp')\" \
+            >Feature Dashboard</a></li> \
+            <li><a  \
+              href=\"javascript:void(0)\"  \
+              onclick=\"Rally.launchApp('ZzacksInitiativeDashboardApp')\" \
+            >Initiative Dashboard</a></li> \
+            <li><a  \
+              href=\"javascript:void(0)\"  \
+              onclick=\"Rally.launchApp('ZzacksAllWorkDashboardApp')\" \
+            >All Work Dashboard</a></li> \
+            <li><a  \
+              href=\"javascript:void(0)\"  \
+              onclick=\"Rally.launchApp('ZzacksWeeklyThroughputDashboardApp')\" \
+            >Weekly Throughput Dashboard</a></li> \
+          </ul> \
+        </div>";
+      }
+
+      Rally.onReady(function () {
+        <!-- put the things here -->
+      });
+    </script>
+
+    <style type="text/css">
+      table {
+        border-collapse: collapse;
+      }
+
+      .tablecell {
+        border: 1px solid black;
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+
+      .title {
+        font-weight: bold;
+        font-size: 14pt;
+      }
+
+      .bold {
+        font-weight: bold;
+        background-color: #e0e0e0;
+      }
+
+      .highlight {
+        font-size: 10pt;
+      }
+
+      .center {
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .filled {
+        font-style: italic;
+        color: #808080;
+      }
+    </style>
+  </head>
+  <body id="the_body" onload="load_menu()">
+  </body>
+</html>
