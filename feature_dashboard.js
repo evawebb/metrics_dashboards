@@ -1,34 +1,7 @@
 Ext.define('ZzacksFeatureDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
-  releases: [
-    {
-      name: '2016 Q4',
-      start_date: new Date('10/10/2016 12:00 AM MDT'),
-      end_date: new Date('01/13/2017 11:59 PM MST')
-    },
-    {
-      name: '2016 Q3',
-      start_date: new Date('07/18/2016 12:00 AM MDT'),
-      end_date: new Date('10/07/2016 11:59 PM MDT')
-    },
-    {
-      name: '2016 Q2',
-      start_date: new Date('04/25/2016 12:00 AM MDT'),
-      end_date: new Date('07/15/2016 11:59 PM MDT')
-    },
-    {
-      name: '2016 Q1',
-      start_date: new Date('01/18/2016 12:00 AM MST'),
-      end_date: new Date('04/22/2016 11:59 PM MDT')
-    }
-  ],
-  colors: {
-    '2016 Q4': '#0000ff',
-    '2016 Q3': '#ff0000',
-    '2016 Q2': '#c0c000',
-    '2016 Q1': '#00ffc0'
-  },
+  color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
   drops: {
     //61568308539: new Date('10/30/2016 12:00 AM MST').toDateString()
   },
@@ -48,10 +21,12 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
     this._mask.show();
 
-    var release_names = this.releases.map(function(r) {
-      return r.name;
-    });
-    this.fetch_committed_features(release_names, [], {});
+    this.fetch_releases(this.getContext().getTimeboxScope());
+  },
+
+  onTimeboxScopeChange: function(ts) {
+    this._mask.show();
+    this.fetch_releases(ts);
   },
 
   haltEarly: function(msg) {
@@ -60,6 +35,58 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this.add({
       xtype: 'component',
       html: 'Error: ' + msg
+    });
+  },
+
+  fetch_releases: function(ts) {
+    this._mask.msg = 'Fetching releases...';
+    this._mask.show();
+
+    var that = this;
+
+    that.releases = [];
+
+    var store = Ext.create('Rally.data.wsapi.Store', {
+      model: 'Release'
+    }, this);
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        if (operation.wasSuccessful()) {
+          records.forEach(function(r) {
+            that.releases.push({
+              name: r.get('Name'),
+              start_date: r.get('ReleaseStartDate'),
+              end_date: r.get('ReleaseDate')
+            });
+          });
+
+          that.releases = that.releases.sort(function(a, b) {
+            return b.name.localeCompare(a.name);
+          });
+
+          var this_release_index = 0;
+          for (var i = 0; i < that.releases.length; i += 1) {
+            if (that.releases[i].name == ts.record.raw.Name) {
+              this_release_index = i;
+            }
+          }
+
+          that.releases = that.releases.slice(this_release_index, this_release_index + 4);
+
+          that.colors = {};
+          for (var i = 0; i < 4; i += 1) {
+            that.colors[that.releases[i].name] = that.color_list[i];
+          }
+
+          that.fetch_committed_features(
+            that.releases.map(function(r) { return r.name; }),
+            [], {}
+          );
+        } else {
+          console.log(':(');
+        }
+      }
     });
   },
 
