@@ -336,45 +336,48 @@
               deltas[r.name] = r_deltas;
             });
 
+            for (var i = 0; i < stories.length; i += 1) {
+              for (var j = i + 1; j < stories.length; j += 1) {
+                if (stories[i].get('FormattedID') == stories[j].get('FormattedID')) {
+                  stories.splice(j, 1);
+                  j -= 1;
+                }
+              }
+            }
+
             stories.forEach(function(s) {
               var release = release_lookups[s.get('Feature').Name];
-              if (deltas.hasOwnProperty(release)) {
+              if (deltas[release]) {
+                var first_date = Object.keys(deltas[release])[0];
                 var r_date = release_dates[s.get('FormattedID')];
                 var c_date = s.get('CreationDate').toDateString();
                 var drop = that.drops[s.get('Feature').ObjectID];
 
-                if (
-                  r_date && deltas[release][r_date]
-                  && (
-                    !drop
-                    || (
-                      drop 
-                      && deltas[release][drop]
-                      && (new Date(drop) > new Date(r_date))
-                    )
-                  )
-                ) {
-                  deltas[release][r_date].released_pts += s.get('PlanEstimate');
-                  deltas[release][r_date].released_stories += 1;
+                if (r_date) {
+                  if (deltas[release][r_date]) {
+                    deltas[release][r_date].released_pts += s.get('PlanEstimate');
+                    deltas[release][r_date].released_stories += 1;
+                  } else if (new Date(r_date) < new Date(first_date)) {
+                    deltas[release][first_date].released_pts += s.get('PlanEstimate');
+                    deltas[release][first_date].released_stories += 1;
+                  }
 
-                  if (drop) {
+                  if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
                     deltas[release][drop].released_pts -= s.get('PlanEstimate');
                     deltas[release][drop].released_stories -= 1;
                   }
                 }
 
-                if (c_date && deltas[release]) {
-                  if (!drop || deltas[release][drop]) {
-                    if (deltas[release][c_date]) {
-                      deltas[release][c_date].created_pts += s.get('PlanEstimate');
-                      deltas[release][c_date].created_stories += 1;
-                    } else {
-                      deltas[release][Object.keys(deltas[release])[0]].created_pts += s.get('PlanEstimate');
-                      deltas[release][Object.keys(deltas[release])[0]].created_stories += 1;
-                    }
+                if (c_date) {
+                  if (deltas[release][c_date]) {
+                    deltas[release][c_date].created_pts += s.get('PlanEstimate');
+                    deltas[release][c_date].created_stories += 1;
+                  } else if (new Date(c_date) < new Date(first_date)) {
+                    deltas[release][first_date].created_pts += s.get('PlanEstimate');
+                    deltas[release][first_date].created_stories += 1;
                   }
 
-                  if (drop && deltas[release][drop]) {
+                  if (drop && deltas[release][drop] && new Date(drop) >= new Date(c_date)) {
                     deltas[release][drop].created_pts -= s.get('PlanEstimate');
                     deltas[release][drop].created_stories -= 1;
                   }
