@@ -47,18 +47,23 @@ Ext.define('ZzacksFeatureDashboardApp', {
     that.releases = [];
 
     var store = Ext.create('Rally.data.wsapi.Store', {
-      model: 'Release'
+      model: 'Release',
+      limit: 1000
     }, this);
     store.load({
       scope: this,
       callback: function(records, operation) {
         if (operation.wasSuccessful()) {
+          var record_names = [];
           records.forEach(function(r) {
-            that.releases.push({
-              name: r.get('Name'),
-              start_date: r.get('ReleaseStartDate'),
-              end_date: r.get('ReleaseDate')
-            });
+            if (!record_names[r.get('Name')]) {
+              record_names[r.get('Name')] = true;
+              that.releases.push({
+                name: r.get('Name'),
+                start_date: r.get('ReleaseStartDate'),
+                end_date: r.get('ReleaseDate')
+              });
+            }
           });
 
           that.releases = that.releases.sort(function(a, b) {
