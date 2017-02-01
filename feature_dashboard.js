@@ -238,19 +238,25 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
     this._mask.show();
 
+    var feature_oids = features.splice(0, 50).map(function(f) {
+      return f.get('ObjectID');
+    });
+
     var that = this;
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['UserStory', 'Defect'],
       filters: [
         {
           property: 'Feature.ObjectID',
-          value: features[0].get('ObjectID')
+          operator: 'in',
+          value: feature_oids
         },
         {
           property: 'DirectChildrenCount',
           value: 0
         }
-      ]
+      ],
+      limit: 2000
     }, this);
     var t1 = new Date();
     store.load({
@@ -261,7 +267,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
         if (operation.wasSuccessful()) {
           stories = stories.concat(records);
         }
-        features.shift();
+        // features.shift();
 
         if (features.length > 0) {
           this.fetch_stories(features, stories, release_lookups);
