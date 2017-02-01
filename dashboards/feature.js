@@ -6,6 +6,9 @@ Ext.define('ZzacksFeatureDashboardApp', {
     //61568308539: new Date('10/30/2016 12:00 AM MST').toDateString()
   },
   histories_cluster_size: 300,
+  update_interval: 1 * 60 * 60 * 1000,
+  // update_interval: 24 * 60 * 60 * 1000,
+  //update_interval: 5 * 60 * 1000,
 
   getUserSettingsFields: function() {
     return []
@@ -21,12 +24,12 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
     this._mask.show();
 
-    this.fetch_releases(this.getContext().getTimeboxScope());
+    this.check_cached_data(this.getContext().getTimeboxScope());
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
-    this.fetch_releases(ts);
+    this.check_cached_data(ts);
   },
 
   haltEarly: function(msg) {
@@ -38,13 +41,41 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
   },
 
+  check_cached_data: function(ts) {
+    var that = this;
+    var release = ts.record.raw.Name;
+    var team = this.getContext().getProject().ObjectID;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        that.prefs = prefs;
+        var key = 'cached_data_' + team + '_' + release;
+        if (prefs[key]) {
+          var cd = JSON.parse(prefs[key]);
+          var last_update = new Date(cd.date);
+          if (new Date() - last_update < that.update_interval) {
+            that.colors = cd.colors;
+            that.releases = cd.releases;
+            that.removeAll();
+            that.create_options(cd.deltas, 'Total points');
+          } else {
+            that.fetch_releases(ts);
+          }
+        } else {
+          that.fetch_releases(ts);
+        }
+      }
+    });
+  },
+
   fetch_releases: function(ts) {
     this._mask.msg = 'Fetching releases...';
     this._mask.show();
 
     var that = this;
 
-    that.releases = [];
+    this.releases = [];
 
     var store = Ext.create('Rally.data.wsapi.Store', {
       model: 'Release',
@@ -80,7 +111,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
           that.releases = that.releases.slice(this_release_index, this_release_index + 4);
 
           that.colors = {};
-          for (var i = 0; i < 4; i += 1) {
+          for (var i = 0; i < that.releases.length; i += 1) {
             that.colors[that.releases[i].name] = that.color_list[i];
           }
 
@@ -435,8 +466,23 @@ Ext.define('ZzacksFeatureDashboardApp', {
       }
     });
 
-    this.removeAll();
-    this.create_options(deltas);
+    var release = this.releases[0].name;
+    var team = this.getContext().getProject().ObjectID;
+    var key = 'cached_data_' + team + '_' + release;
+    this.prefs[key] = JSON.stringify({
+      date: new Date(),
+      colors: this.colors,
+      deltas: deltas,
+      releases: this.releases
+    });
+    Rally.data.PreferenceManager.update({
+      appID: this.getAppId(),
+      settings: this.prefs,
+      success: function(new_records, old_records) {
+        that.removeAll();
+        that.create_options(deltas);
+      }
+    });
   },
 
   create_options: function(deltas) {
