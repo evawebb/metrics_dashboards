@@ -267,7 +267,6 @@ Ext.define('ZzacksFeatureDashboardApp', {
         if (operation.wasSuccessful()) {
           stories = stories.concat(records);
         }
-        // features.shift();
 
         if (features.length > 0) {
           this.fetch_stories(features, stories, release_lookups);
@@ -350,6 +349,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
   construct_series: function(release_dates, stories, release_lookups) {
     var that = this;
     var deltas = {};
+
     this.releases.forEach(function(r) {
       var r_deltas = {};
       var now = new Date();
@@ -367,14 +367,21 @@ Ext.define('ZzacksFeatureDashboardApp', {
       deltas[r.name] = r_deltas;
     });
 
-    for (var i = 0; i < stories.length; i += 1) {
+    var dedupe = function(i) {
       for (var j = i + 1; j < stories.length; j += 1) {
         if (stories[i].get('FormattedID') == stories[j].get('FormattedID')) {
           stories.splice(j, 1);
           j -= 1;
         }
       }
-    }
+
+      if (i + 1 < stories.length) {
+        setTimeout(function() {
+          dedupe(i + 1);
+        }, 0);
+      }
+    };
+    dedupe(0);
 
     stories.forEach(function(s) {
       var release = release_lookups[s.get('Feature').Name];
@@ -427,6 +434,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
         r_deltas[d_next].created_stories += r_deltas[d_prev].created_stories;
       }
     });
+
     this.removeAll();
     this.create_options(deltas);
   },
