@@ -1,16 +1,31 @@
 <div>
-  <ul>
-    <li><a
-      href="javascript:void(0)\"
-      onclick="Rally.launchApp('ZzacksTeamDashboardApp')"
-    >Team Dashboard</a></li>
-    <li><a
-      href="javascript:void(0)\"
-      onclick="Rally.launchApp('ZzacksAllWorkDashboardApp')"
-    >All Work Dashboard</a></li>
-    <li><a
-      href="javascript:void(0)\"
-      onclick="Rally.launchApp('ZzacksWeeklyThroughputDashboardApp')"
-    >Weekly Throughput Dashboard</a></li>
-  </ul>
+  <table class="center">
+    <tr>
+      <td class="tablecell"><a
+        href="javascript:void(0)\"
+        onclick="Rally.launchApp('ZzacksTeamDashboardApp')"
+      >Team Dashboard</a></td>
+      <td class="tablecell">
+        This page is designed to help a team understand how quickly they are moving work through the pipeline. The main summary table reports statistics such as throughput and average cycle time for stories, CV defects, and non-CV defects. The bubble chart visualizes each artifact that was released during the quarter, showing their release date, cycle time, and plan estimate. Finally, the cumulative flow chart visualizes the rate at which artifacts move across the kanban.
+      </td>
+    </tr>
+    <tr>
+      <td class="tablecell"><a
+        href="javascript:void(0)\"
+        onclick="Rally.launchApp('ZzacksAllWorkDashboardApp')"
+      >All Work Dashboard</a></td>
+      <td class="tablecell">
+        This page's graph shows the progress of all work completed in each of the quarters that it considers. All work (whether it was planned feature work or not) is included; so long as it is completed during the quarter's timebox, it is featured on the graph.
+      </td>
+    </tr>
+    <tr>
+      <td class="tablecell"><a
+        href="javascript:void(0)\"
+        onclick="Rally.launchApp('ZzacksWeeklyThroughputDashboardApp')"
+      >Weekly Throughput Dashboard</a></td>
+      <td class="tablecell">
+        This page's graph shows the number of artifacts that are completed each week for the trailing 52 weeks. Stories and defects can be counted separately, or added together into one data series.
+      </td>
+    </tr>
+  </table>
 </div>
