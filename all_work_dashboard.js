@@ -80,10 +80,10 @@ Ext.define('ZzacksAllWorkDashboardApp', {
             that.colors[that.releases[i].name] = that.color_list[i];
           }
 
-          that.fetch_committed_features(
-            that.releases.map(function(r) { return r.name; }),
-            [], {}
-          );
+          that.fetch_artifacts({
+            UserStory: {},
+            Defect: {}
+          }, 3, 'UserStory');
         } else {
           console.log(':(');
         }
