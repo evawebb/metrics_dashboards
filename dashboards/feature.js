@@ -24,17 +24,35 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this._mask.show();
 
     this.ts = this.getContext().getTimeboxScope();
-    this.check_cached_data(this.ts);
+    var that = this;
+    this.start(function() {
+      that.check_cached_data(that.ts);
+    });
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
     this.ts = ts;
-    this.check_cached_data(ts);
+    var that = this;
+    this.start(function() {
+      that.check_cached_data(ts);
+    });
   },
 
   refresh: function() {
-    this.fetch_releases(this.ts);
+    var that = this;
+    this.start(function() {
+      that.fetch_releases(that.ts);
+    });
+  },
+
+  start: function(call_thru) {
+    if (this.locked) {
+      alert("Please wait for the calculation to finish before starting a new calculation.\n\nIf you tried to change the timebox scope, you will need to re-select the scope you're trying to look at.");
+    } else {
+      this.locked = true;
+      call_thru();
+    }
   },
 
   haltEarly: function(msg) {
@@ -590,6 +608,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
      
     this._mask.hide();
+    this.locked = false;
   },
 
   change_graph_type: function(t, new_item, old_item, e) {
