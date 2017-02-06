@@ -498,7 +498,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   add_settings_link: function() {
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
     });
     this.add({
       xtype: 'component',

@@ -219,7 +219,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a>'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',
