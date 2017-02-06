@@ -3,12 +3,11 @@ Ext.define('ZzacksFeatureDashboardApp', {
   scopeType: 'release',
   color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
   drops: {
-    //61568308539: new Date('10/30/2016 12:00 AM MST').toDateString()
   },
   histories_cluster_size: 300,
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
-  //update_interval: 5 * 60 * 1000,
+  // update_interval: 5 * 60 * 1000,
 
   getUserSettingsFields: function() {
     return []
@@ -24,12 +23,18 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
     this._mask.show();
 
-    this.check_cached_data(this.getContext().getTimeboxScope());
+    this.ts = this.getContext().getTimeboxScope();
+    this.check_cached_data(this.ts);
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
+    this.ts = ts;
     this.check_cached_data(ts);
+  },
+
+  refresh: function() {
+    this.fetch_releases(this.ts);
   },
 
   haltEarly: function(msg) {
@@ -389,10 +394,10 @@ Ext.define('ZzacksFeatureDashboardApp', {
       }
       for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
         r_deltas[d.toDateString()] = {
-          released_pts: 0,
-          created_pts: 0,
-          released_stories: 0,
-          created_stories: 0
+          rp: 0,
+          cp: 0,
+          rs: 0,
+          cs: 0
         };
       }
       deltas[r.name] = r_deltas;
@@ -424,31 +429,31 @@ Ext.define('ZzacksFeatureDashboardApp', {
 
         if (r_date) {
           if (deltas[release][r_date]) {
-            deltas[release][r_date].released_pts += s.get('PlanEstimate');
-            deltas[release][r_date].released_stories += 1;
+            deltas[release][r_date].rp += s.get('PlanEstimate');
+            deltas[release][r_date].rs += 1;
           } else if (new Date(r_date) < new Date(first_date)) {
-            deltas[release][first_date].released_pts += s.get('PlanEstimate');
-            deltas[release][first_date].released_stories += 1;
+            deltas[release][first_date].rp += s.get('PlanEstimate');
+            deltas[release][first_date].rs += 1;
           }
 
           if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
-            deltas[release][drop].released_pts -= s.get('PlanEstimate');
-            deltas[release][drop].released_stories -= 1;
+            deltas[release][drop].rp -= s.get('PlanEstimate');
+            deltas[release][drop].rs -= 1;
           }
         }
 
         if (c_date) {
           if (deltas[release][c_date]) {
-            deltas[release][c_date].created_pts += s.get('PlanEstimate');
-            deltas[release][c_date].created_stories += 1;
+            deltas[release][c_date].cp += s.get('PlanEstimate');
+            deltas[release][c_date].cs += 1;
           } else if (new Date(c_date) < new Date(first_date)) {
-            deltas[release][first_date].created_pts += s.get('PlanEstimate');
-            deltas[release][first_date].created_stories += 1;
+            deltas[release][first_date].cp += s.get('PlanEstimate');
+            deltas[release][first_date].cs += 1;
           }
 
           if (drop && deltas[release][drop] && new Date(drop) >= new Date(c_date)) {
-            deltas[release][drop].created_pts -= s.get('PlanEstimate');
-            deltas[release][drop].created_stories -= 1;
+            deltas[release][drop].cp -= s.get('PlanEstimate');
+            deltas[release][drop].cs -= 1;
           }
         }
       }
@@ -459,10 +464,10 @@ Ext.define('ZzacksFeatureDashboardApp', {
       for (var i = 0; i < Object.keys(r_deltas).length - 1; i += 1) {
         var d_prev = Object.keys(r_deltas)[i];
         var d_next = Object.keys(r_deltas)[i + 1];
-        r_deltas[d_next].released_pts += r_deltas[d_prev].released_pts;
-        r_deltas[d_next].released_stories += r_deltas[d_prev].released_stories;
-        r_deltas[d_next].created_pts += r_deltas[d_prev].created_pts;
-        r_deltas[d_next].created_stories += r_deltas[d_prev].created_stories;
+        r_deltas[d_next].rp += r_deltas[d_prev].rp;
+        r_deltas[d_next].rs += r_deltas[d_prev].rs;
+        r_deltas[d_next].cp += r_deltas[d_prev].cp;
+        r_deltas[d_next].cs += r_deltas[d_prev].cs;
       }
     });
 
@@ -478,7 +483,10 @@ Ext.define('ZzacksFeatureDashboardApp', {
     Rally.data.PreferenceManager.update({
       appID: this.getAppId(),
       settings: this.prefs,
-      success: function(new_records, old_records) {
+      success: function(response) {
+        if (response[0].errorMessages) {
+          console.log('Error saving preferences:', response[0].errorMessages);
+        }
         that.removeAll();
         that.create_options(deltas);
       }
@@ -489,7 +497,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',
@@ -530,14 +538,14 @@ Ext.define('ZzacksFeatureDashboardApp', {
       Object.keys(deltas[release]).forEach(function(d) {
         released_data.push({
           y: points ?
-            deltas[release][d].released_pts :
-            deltas[release][d].released_stories,
+            deltas[release][d].rp :
+            deltas[release][d].rs,
           date: d
         });
         created_data.push({
           y: points ?
-            deltas[release][d].created_pts :
-            deltas[release][d].created_stories,
+            deltas[release][d].cp :
+            deltas[release][d].cs,
           date: d
         });
       });

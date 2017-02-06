@@ -17,12 +17,18 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
     this._mask.show();
 
-    this.fetch_releases(this.getContext().getTimeboxScope());
+    this.ts = this.getContext().getTimeboxScope();
+    this.fetch_releases(this.ts);
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
+    this.ts = ts;
     this.fetch_releases(ts);
+  },
+
+  refresh: function() {
+    this.fetch_releases(this.ts);
   },
 
   haltEarly: function(msg) {
@@ -219,7 +225,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',

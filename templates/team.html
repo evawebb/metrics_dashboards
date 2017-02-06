@@ -16,6 +16,18 @@
         }
       }
 
+      function refresh_team() {
+        Rally.getApp('ZzacksTeamDashboardApp').refresh();
+      }
+
+      function refresh_all_work() {
+        Rally.getApp('ZzacksAllWorkDashboardApp').refresh();
+      }
+
+      function refresh_weekly() {
+        Rally.getApp('ZzacksWeeklyThroughputDashboardApp').refresh();
+      }
+
       function load_menu() {
         var b = document.getElementById("the_body");
         b.innerHTML = "<!-- put the menu here -->";

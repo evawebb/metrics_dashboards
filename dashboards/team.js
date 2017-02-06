@@ -74,7 +74,8 @@ Ext.define('ZzacksTeamDashboardApp', {
       this.cycle_time_start_state = settings['Cycle Time Start State'];
       this.cycle_time_end_state = settings['Cycle Time End State'];
       this._mask.show();
-      this.fetch_iterations(this.getContext().getTimeboxScope());
+      this.ts = this.getContext().getTimeboxScope();
+      this.fetch_iterations(this.ts);
     }
   },
 
@@ -94,12 +95,18 @@ Ext.define('ZzacksTeamDashboardApp', {
       msg: 'Please wait...'
     });
     this._mask.show();
-    this.fetch_iterations(this.getContext().getTimeboxScope());
+    this.ts = this.getContext().getTimeboxScope();
+    this.fetch_iterations(this.ts);
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
+    this.ts = ts;
     this.fetch_iterations(ts);
+  },
+
+  refresh: function() {
+    this.fetch_iterations(this.ts);
   },
 
   haltEarly: function(msg) {
@@ -882,7 +889,7 @@ Ext.define('ZzacksTeamDashboardApp', {
   add_settings_link: function() {
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'component',

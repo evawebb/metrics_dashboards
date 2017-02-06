@@ -44,6 +44,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this.fetch_initiative(ts);
   },
 
+  refresh: function() {
+    this.fetch_initiative(this.ts);
+  },
+
   haltEarly: function(msg) {
     this._mask.hide();
     this.removeAll();
@@ -498,7 +502,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   add_settings_link: function() {
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_initiative()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'component',

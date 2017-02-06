@@ -15,7 +15,14 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
       msg: 'Please wait...'
     });
     this._mask.show();
+    this.start();
+  },
 
+  refresh: function() {
+    this.start();
+  },
+
+  start: function() {
     this.project_oid = this.getContext().getProject().ObjectID;
     var start_date = this.calculate_first_date();
     this.fetch_stories({}, start_date, 52);
@@ -96,7 +103,7 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_weekly()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',

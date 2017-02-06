@@ -4,16 +4,20 @@
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
-      function toggle_big_table() {
-        var t = document.getElementById("big_table");
-        var l = document.getElementById("toggle_link");
-        if (t.style.display == "inline") {
-          t.style.display = "none";
-          l.innerHTML = "Show all stories";
-        } else {
-          t.style.display = "inline";
-          l.innerHTML = "Hide all stories";
-        }
+      function refresh_feature() {
+        Rally.getApp('ZzacksFeatureDashboardApp').refresh();
+      }
+
+      function refresh_initiative() {
+        Rally.getApp('ZzacksInitiativeDashboardApp').refresh();
+      }
+
+      function refresh_all_work() {
+        Rally.getApp('ZzacksAllWorkDashboardApp').refresh();
+      }
+
+      function refresh_weekly() {
+        Rally.getApp('ZzacksWeeklyThroughputDashboardApp').refresh();
       }
 
       function load_menu() {
