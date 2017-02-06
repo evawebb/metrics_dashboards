@@ -7,7 +7,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
   histories_cluster_size: 300,
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
-  // update_interval: 5 * 60 * 1000,
+  cache_tag: 'cached_data_f_',
 
   getUserSettingsFields: function() {
     return []
@@ -72,7 +72,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
       success: function(prefs) {
         var stale = [];
         Object.keys(prefs).forEach(function(p) {
-          if (p.substr(0, 11) == 'cached_data') {
+          if (p.substr(0, 14) == that.cache_tag) {
             var last_update = new Date(JSON.parse(prefs[p]).date);
             if (new Date() - last_update > that.update_interval) {
               stale.push(p);
@@ -110,7 +110,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
       appID: this.getAppId(),
       success: function(prefs) {
         that.prefs = prefs;
-        var key = 'cached_data_' + team + '_' + release;
+        var key = that.cache_tag + team + '_' + release;
         if (prefs[key]) {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
@@ -528,7 +528,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
 
     var release = this.releases[0].name;
     var team = this.getContext().getProject().ObjectID;
-    var key = 'cached_data_' + team + '_' + release;
+    var key = this.cache_tag + team + '_' + release;
     this.prefs[key] = JSON.stringify({
       date: new Date(),
       colors: this.colors,

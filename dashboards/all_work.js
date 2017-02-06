@@ -2,6 +2,9 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
   color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
+  update_interval: 1 * 60 * 60 * 1000,
+  // update_interval: 24 * 60 * 60 * 1000,
+  cache_tag: 'cached_data_a_',
 
   getUserSettingsFields: function() {
     return [];
@@ -18,17 +21,35 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     this._mask.show();
 
     this.ts = this.getContext().getTimeboxScope();
-    this.fetch_releases(this.ts);
+    var that = this;
+    this.start(function() {
+      that.clean_cached_data(that.ts);
+    });
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
     this.ts = ts;
-    this.fetch_releases(ts);
+    var that = this;
+    this.start(function() {
+      that.clean_cached_data(ts);
+    });
   },
 
   refresh: function() {
-    this.fetch_releases(this.ts);
+    var that = this;
+    this.start(function() {
+      that.fetch_releases(that.ts);
+    });
+  },
+
+  start: function(call_thru) {
+    if (this.locked) {
+      alert("Please wait for the calculation to finish before starting a new calculation.\n\nIf you tried to change the timebox scope, you will need to re-select the scope you're trying to look at.");
+    } else {
+      this.locked = true;
+      call_thru();
+    }
   },
 
   haltEarly: function(msg) {
@@ -37,6 +58,71 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     this.add({
       xtype: 'component',
       html: 'Error: ' + msg
+    });
+  },
+
+  clean_cached_data: function(ts) {
+    var that = this;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        var stale = [];
+        Object.keys(prefs).forEach(function(p) {
+          if (p.substr(0, 11) == that.cache_tag) {
+            var last_update = new Date(JSON.parse(prefs[p]).date);
+            if (new Date() - last_update > that.update_interval) {
+              stale.push(p);
+            }
+          }
+        });
+
+        that.delete_prefs(stale, ts);
+      }
+    });
+  },
+
+  delete_prefs: function(stale, ts) {
+    if (stale.length > 0) {
+      var that = this;
+      Rally.data.PreferenceManager.remove({
+        appID: this.getAppId(),
+        filterByName: stale[0],
+        success: function() {
+          stale.shift();
+          that.delete_prefs(stale, ts);
+        }
+      });
+    } else {
+      this.check_cached_data(ts);
+    }
+  },
+
+  check_cached_data: function(ts) {
+    var that = this;
+    var release = ts.record.raw.Name;
+    var team = this.getContext().getProject().ObjectID;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        that.prefs = prefs;
+        var key = that.cache_tag + team + '_' + release;
+        if (prefs[key]) {
+          var cd = JSON.parse(prefs[key]);
+          var last_update = new Date(cd.date);
+          if (new Date() - last_update < that.update_interval) {
+            that.colors = cd.colors;
+            that.releases = cd.releases;
+            that.removeAll();
+            that.create_options(cd.deltas, 'Total points');
+          } else {
+            that.fetch_releases(ts);
+          }
+        } else {
+          that.fetch_releases(ts);
+        }
+      }
     });
   },
 
@@ -87,8 +173,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
           }
 
           that.fetch_artifacts({
-            UserStory: {},
-            Defect: {}
+            u: {},
+            d: {}
           }, 3, 'UserStory');
         } else {
           console.log(':(');
@@ -126,7 +212,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
         console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
         if (operation.wasSuccessful()) {
-          artifacts[type][that.releases[release_index].name] = records;
+          var key = (type == 'UserStory') ? 'u' : 'd';
+          artifacts[key][that.releases[release_index].name] = records;
         }
 
         if (release_index > 0) {
@@ -156,37 +243,37 @@ Ext.define('ZzacksAllWorkDashboardApp', {
       }
       for (var d = new Date(r.start_date); d <= now; d.setDate(d.getDate() + 1)) {
         r_deltas[d.toDateString()] = {
-          accepted_pts: {
-            UserStory: 0,
-            Defect: 0
+          ap: {
+            u: 0,
+            d: 0
           },
-          accepted_stories: {
-            UserStory: 0,
-            Defect: 0
+          as: {
+            u: 0,
+            d: 0
           }
         };
       }
       deltas[r.name] = r_deltas;
     });
 
-    Object.keys(artifacts.UserStory).forEach(function(r) {
-      artifacts.UserStory[r].forEach(function(s) {
+    Object.keys(artifacts.u).forEach(function(r) {
+      artifacts.u[r].forEach(function(s) {
         var a_date = s.get('AcceptedDate').toDateString();
         if (a_date && deltas[r][a_date]) {
-          deltas[r][a_date].accepted_pts.UserStory += s.get('PlanEstimate');
-          deltas[r][a_date].accepted_stories.UserStory += 1;
+          deltas[r][a_date].ap.u += s.get('PlanEstimate');
+          deltas[r][a_date].as.u += 1;
         } else {
           console.log('Weird story!', s);
         }
       });
     });
 
-    Object.keys(artifacts.Defect).forEach(function(r) {
-      artifacts.Defect[r].forEach(function(s) {
+    Object.keys(artifacts.d).forEach(function(r) {
+      artifacts.d[r].forEach(function(s) {
         var a_date = s.get('AcceptedDate').toDateString();
         if (a_date && deltas[r][a_date]) {
-          deltas[r][a_date].accepted_pts.Defect += s.get('PlanEstimate');
-          deltas[r][a_date].accepted_stories.Defect += 1;
+          deltas[r][a_date].ap.d += s.get('PlanEstimate');
+          deltas[r][a_date].as.d += 1;
         } else {
           console.log('Weird story!', s);
         }
@@ -195,30 +282,48 @@ Ext.define('ZzacksAllWorkDashboardApp', {
 
     Object.keys(deltas).forEach(function(r) {
       var d_first = Object.keys(deltas[r])[0];
-      deltas[r][d_first].accepted_pts.Both =
-        deltas[r][d_first].accepted_pts.UserStory +
-        deltas[r][d_first].accepted_pts.Defect;
-      deltas[r][d_first].accepted_stories.Both =
-        deltas[r][d_first].accepted_stories.UserStory +
-        deltas[r][d_first].accepted_stories.Defect;
+      deltas[r][d_first].ap.b =
+        deltas[r][d_first].ap.u +
+        deltas[r][d_first].ap.d;
+      deltas[r][d_first].as.b =
+        deltas[r][d_first].as.u +
+        deltas[r][d_first].as.d;
       for (var i = 0; i < Object.keys(deltas[r]).length - 1; i += 1) {
         var d_prev = Object.keys(deltas[r])[i];
         var d_next = Object.keys(deltas[r])[i + 1];
-        deltas[r][d_next].accepted_pts.UserStory += deltas[r][d_prev].accepted_pts.UserStory;
-        deltas[r][d_next].accepted_stories.UserStory += deltas[r][d_prev].accepted_stories.UserStory;
-        deltas[r][d_next].accepted_pts.Defect += deltas[r][d_prev].accepted_pts.Defect;
-        deltas[r][d_next].accepted_stories.Defect += deltas[r][d_prev].accepted_stories.Defect;
-        deltas[r][d_next].accepted_pts.Both =
-          deltas[r][d_next].accepted_pts.UserStory +
-          deltas[r][d_next].accepted_pts.Defect;
-        deltas[r][d_next].accepted_stories.Both =
-          deltas[r][d_next].accepted_stories.UserStory +
-          deltas[r][d_next].accepted_stories.Defect;
+        deltas[r][d_next].ap.u += deltas[r][d_prev].ap.u;
+        deltas[r][d_next].as.u += deltas[r][d_prev].as.u;
+        deltas[r][d_next].ap.d += deltas[r][d_prev].ap.d;
+        deltas[r][d_next].as.d += deltas[r][d_prev].as.d;
+        deltas[r][d_next].ap.b =
+          deltas[r][d_next].ap.u +
+          deltas[r][d_next].ap.d;
+        deltas[r][d_next].as.b =
+          deltas[r][d_next].as.u +
+          deltas[r][d_next].as.d;
       }
     });
 
-    this.removeAll();
-    this.create_options(deltas);
+    var release = this.releases[0].name;
+    var team = this.getContext().getProject().ObjectID;
+    var key = this.cache_tag + team + '_' + release;
+    this.prefs[key] = JSON.stringify({
+      date: new Date(),
+      colors: this.colors,
+      deltas: deltas,
+      releases: this.releases
+    });
+    Rally.data.PreferenceManager.update({
+      appID: this.getAppId(),
+      settings: this.prefs,
+      success: function(response) {
+        if (response[0].errorMessages) {
+          console.log('Error saving preferences:', response[0].errorMessages);
+        }
+        that.removeAll();
+        that.create_options(deltas);
+      }
+    });
   },
 
   create_options: function(deltas) {
@@ -249,7 +354,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
 
     this.deltas = deltas;
-    this.artifact_type = 'UserStory';
+    this.artifact_type = 'u';
     this.graph_type = 'Total points';
 
     this.build_charts(deltas, this.graph_type, this.artifact_type);
@@ -269,8 +374,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
       Object.keys(deltas[release]).forEach(function(d) {
         data.push({
           y: points ?
-            deltas[release][d].accepted_pts[artifact_type] :
-            deltas[release][d].accepted_stories[artifact_type],
+            deltas[release][d].ap[artifact_type] :
+            deltas[release][d].as[artifact_type],
           date: d
         });
       });
@@ -283,9 +388,9 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
 
     var title_type = 'Stories';
-    if (artifact_type == 'Defect') {
+    if (artifact_type == 'd') {
       title_type = 'Defects';
-    } else if (artifact_type == 'Both') {
+    } else if (artifact_type == 'b') {
       title_type = 'Both';
     }
 
@@ -325,22 +430,23 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
 
     this._mask.hide();
+    this.locked = false;
   },
 
   change_story_types: function(t, new_item, old_item, e) {
     if (old_item && this.chart) {
       if (new_item == 'Just stories') {
-        this.artifact_type = 'UserStory';
+        this.artifact_type = 'u';
         this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'UserStory');
+        this.build_charts(this.deltas, this.graph_type, 'u');
       } else if (new_item == 'Just defects') {
-        this.artifact_type = 'Defect';
+        this.artifact_type = 'd';
         this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'Defect');
+        this.build_charts(this.deltas, this.graph_type, 'd');
       } else {
-        this.artifact_type = 'Both';
+        this.artifact_type = 'b';
         this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'Both');
+        this.build_charts(this.deltas, this.graph_type, 'b');
       }
     }
   },
