@@ -6,6 +6,9 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
   getUserSettingsFields: function() {
     return [{
+      xtype: 'component',
+      html: 'Type the name or code of the initiative below, then select it from the dropdown.'
+    }, {
       name: 'Initiative',
       xtype: 'rallyartifactsearchcombobox',
       storeConfig: {
