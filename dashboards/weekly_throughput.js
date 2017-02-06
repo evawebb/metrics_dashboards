@@ -179,7 +179,6 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
           type: 'line'
         },
         title: { text: 'Stories/defects accepted per week' },
-        // subtitle: { text: 'subtitle' },
         xAxis: {
           title: { text: 'Week of...' },
           labels: {

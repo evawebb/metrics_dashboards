@@ -176,7 +176,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           property: 'RevisionNumber',
           direction: 'ASC'
         }
-      ]
+      ],
+      limit: 1000
     }, this);
     var t1 = new Date();
     store.load({
@@ -435,13 +436,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         y: points ?
           deltas[d].released_pts :
           deltas[d].released_stories,
-        date: d
+        date: d,
+        x: new Date(d).getTime()
       });
       created_data.push({
         y: points ?
           deltas[d].created_pts :
           deltas[d].created_stories,
-        date: d
+        date: d,
+        x: new Date(d).getTime()
       });
     });
 
@@ -457,7 +460,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     var chart_config = {
       chart: { type: 'line' },
       xAxis: { 
-        title: { text: 'Days into the quarter' }
+        title: { text: 'Days into the quarter' },
+        max: new Date(this.ts.record.raw.ReleaseDate).getTime(),
+        min: new Date(this.ts.record.raw.ReleaseStartDate).getTime(),
+        labels: { 
+          formatter: function() {
+            return new Date(this.value).toDateString();
+          },
+          rotation: -20
+        }
       },
       plotOptions: { line: {
         lineWidth: 3,
