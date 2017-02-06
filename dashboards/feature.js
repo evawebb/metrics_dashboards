@@ -26,7 +26,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this.ts = this.getContext().getTimeboxScope();
     var that = this;
     this.start(function() {
-      that.check_cached_data(that.ts);
+      that.clean_cached_data(that.ts);
     });
   },
 
@@ -35,7 +35,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this.ts = ts;
     var that = this;
     this.start(function() {
-      that.check_cached_data(ts);
+      that.clean_cached_data(ts);
     });
   },
 
@@ -62,6 +62,43 @@ Ext.define('ZzacksFeatureDashboardApp', {
       xtype: 'component',
       html: 'Error: ' + msg
     });
+  },
+
+  clean_cached_data: function(ts) {
+    var that = this;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        var stale = [];
+        Object.keys(prefs).forEach(function(p) {
+          if (p.substr(0, 11) == 'cached_data') {
+            var last_update = new Date(JSON.parse(prefs[p]).date);
+            if (new Date() - last_update > that.update_interval) {
+              stale.push(p);
+            }
+          }
+        });
+
+        that.delete_prefs(stale, ts);
+      }
+    });
+  },
+
+  delete_prefs: function(stale, ts) {
+    if (stale.length > 0) {
+      var that = this;
+      Rally.data.PreferenceManager.remove({
+        appID: this.getAppId(),
+        filterByName: stale[0],
+        success: function() {
+          stale.shift();
+          that.delete_prefs(stale, ts);
+        }
+      });
+    } else {
+      this.check_cached_data(ts);
+    }
   },
 
   check_cached_data: function(ts) {
