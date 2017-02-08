@@ -10,6 +10,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     'Tags',
     'RevisionHistory',
     'Revisions',
+    'KanbanRevisions',
     'CreationDate',
     'InProgressDate',
     'AcceptedDate',
@@ -201,7 +202,7 @@ Ext.define('ZzacksTeamDashboardApp', {
           this.fetch_stories(iterations, stories);
         } else {
           if (stories.length > 0) {
-            this.fetch_histories(stories);
+            this.fetch_kanban_states(stories);
           } else {
             this.haltEarly('No stories found.');
           }
@@ -209,6 +210,36 @@ Ext.define('ZzacksTeamDashboardApp', {
       }
     });
   },
+
+  // Fetch the allowed kanban states so the order is known.
+  fetch_kanban_states: function(stories) {
+    this._mask.msg = 'Fetching kanban states...';
+    this._mask.show();
+
+    var that = this;
+
+    this.kanban_states = [];
+    this.kanban_votes = {};
+    Rally.data.ModelFactory.getModel({
+    type: 'UserStory',
+    success: function(model) {
+      model.getField('c_KanbanState').getAllowedValueStore().load({
+        callback: function(records, operation, success) {
+          if (success) {
+            records.forEach(function(r) {
+              that.kanban_states[r.get('ValueIndex')] = r.get('StringValue');
+              that.kanban_votes[r.get('StringValue')] = false;
+            });
+          } else {
+            console.log(':(');
+          }
+
+          that.fetch_histories(stories);
+        }
+      });
+    }
+    });
+  }, 
 
   // Fetch the revisions for all the stories.
   fetch_histories: function(stories) {
@@ -218,13 +249,14 @@ Ext.define('ZzacksTeamDashboardApp', {
     var hashed_stories = {};
     stories.forEach(function(s) {
       s.data.Revisions = [];
+      s.data.KanbanRevisions = [];
       hashed_stories[s.get('ObjectID')] = s;
     });
 
     var that = this;
     var t1 = new Date();
     var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-      fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom'],
+      fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom', 'c_KanbanState', '_PreviousValues.c_KanbanState'],
       hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
       filters: [
         {
@@ -240,22 +272,42 @@ Ext.define('ZzacksTeamDashboardApp', {
           var t2 = new Date();
           console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
           if (success) {
-            data.filter(function(d) {
-              return (
+            data.forEach(function(d) {
+              if (
                 (
                   d.get('_PreviousValues.ScheduleState')
                   && d.get('_PreviousValues.ScheduleState').length > 0
                 )
                 || d.get('_PreviousValues.ScheduleState') === null
-              );
-            }).forEach(function(d) {
-              hashed_stories[d.get('ObjectID')].data.Revisions.push({
-                from: d.get('_PreviousValues.ScheduleState'),
-                to: d.get('ScheduleState'),
-                on: d.get('_ValidFrom')
-              });
+              ) {
+                hashed_stories[d.get('ObjectID')].data.Revisions.push({
+                  from: d.get('_PreviousValues.ScheduleState'),
+                  to: d.get('ScheduleState'),
+                  on: d.get('_ValidFrom')
+                });
+              }
+
+              if (
+                (
+                  d.get('_PreviousValues.c_KanbanState')
+                  && d.get('_PreviousValues.c_KanbanState').length > 0
+                )
+                || d.get('_PreviousValues.c_KanbanState') === null
+              ) {
+                hashed_stories[d.get('ObjectID')].data.KanbanRevisions.push({
+                  from: d.get('_PreviousValues.c_KanbanState'),
+                  to: d.get('c_KanbanState'),
+                  on: d.get('_ValidFrom')
+                });
+                that.kanban_votes[d.get('_PreviousValues.c_KanbanState')] = true;
+                that.kanban_votes[d.get('c_KanbanState')] = true;
+              }
             });
           }
+
+          that.kanban_states = that.kanban_states.filter(function(k) {
+            return that.kanban_votes[k];
+          });
 
           that.get_story_data(stories, []);
         }
@@ -529,6 +581,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     this.create_options(stories);
     this.build_plot(stories);
     this.build_flow_dia(stories);
+    this.build_kanban_dia(stories);
     this._mask.hide();
   },
 
@@ -860,6 +913,93 @@ Ext.define('ZzacksTeamDashboardApp', {
           type: 'area'
         },
         title: { text: 'Release Cumulative Flow' },
+        xAxis: { 
+          title: { enabled: false },
+          tickInterval: 7
+        },
+        yAxis: { title: { text: 'Total points' } },
+        plotOptions: {
+          area: {
+            stacking: 'normal',
+            lineColor: '#666666',
+            lineWidth: 1,
+            tooltip: { split: true, valueSuffix: ' stories' },
+            marker: { enabled: false }
+          }
+        }
+      }
+    });
+  },
+
+  build_kanban_dia: function(stories) {
+    var that = this;
+
+    var totals = {};
+    var start = {};
+    var now = new Date();
+    if (new Date(this.end_date) < now) {
+      now = new Date(this.end_date);
+    }
+    for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+      totals[d.toDateString()] = {};
+    }
+    this.kanban_states.forEach(function(dt) {
+      Object.keys(totals).forEach(function(date) {
+        totals[date][dt] = 0;
+      });
+      start[dt] = 0;
+    });
+
+    stories.forEach(function(s) {
+      s.KanbanRevisions.forEach(function(t) {
+        var date = new Date(t.on);
+        if (totals[date.toDateString()]) {
+          totals[date.toDateString()][t.to] += 1;
+          if (t.from) {
+            totals[date.toDateString()][t.from] -= 1;
+          }
+        } else if (date < new Date(that.start_date)) {
+          start[t.to] += 1;
+          if (t.from) {
+            start[t.from] -= 1;
+          }
+        }
+      });
+    });
+
+    var prev = start;
+    var categories = [];
+    var mapped_series = {};
+    this.kanban_states.forEach(function(dt) {
+      mapped_series[dt] = [];
+    });
+    for (var d = new Date(this.start_date); d <= now; d.setDate(d.getDate() + 1)) {
+      var df = d.toDateString();
+      categories.push(df);
+      that.kanban_states.forEach(function(dt) {
+        totals[df][dt] += prev[dt];
+        mapped_series[dt].push(totals[df][dt]);
+      });
+      prev = totals[df];
+    }
+
+    var series = [];
+    this.kanban_states.forEach(function(dt) {
+      series.push({
+        name: dt,
+        data: mapped_series[dt]
+      });
+    });
+
+    var chart = this.add({
+      xtype: 'rallychart',
+      loadMask: false,
+      chartData: { series: series, categories: categories },
+      chartConfig: {
+        chart: {
+          type: 'area'
+        },
+        title: { text: 'Kanban Cumulative Flow' },
         xAxis: { 
           title: { enabled: false },
           tickInterval: 7
