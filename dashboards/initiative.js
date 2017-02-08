@@ -107,7 +107,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           if (records.length > 0) {
             that.fetch_unscheduled_features(records, initiative, ts);
           } else {
-            that.haltEarly('No features found.');
+            that.fetch_initiatives({}, initiative, ts);
           }
         }
       }
@@ -392,26 +392,65 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Initiative'],
       fetch: ['Name', 'FormattedID'],
-      filters: [
-        {
-          property: 'LastUpdateDate',
-          operator: '>',
-          value: ts.record.raw.ReleaseStartDate
-        }
-      ]
+      limit: 1000
+      // filters: [
+      //   {
+      //     property: 'LastUpdateDate',
+      //     operator: '>',
+      //     value: ts.record.raw.ReleaseStartDate
+      //   }
+      // ]
     }, this);
     store.load({
       scope: this,
       callback: function(records, operation) {
         var init_list = [];
         if (operation.wasSuccessful()) {
-          init_list = records.map(function(r) {
-            return r.get('FormattedID') + ': ' + r.get('Name');
-          });
+          init_list = records;
         }
 
         this.removeAll();
-        that.create_options(deltas, initiative, init_list);
+        that.filter_initiatives(deltas, initiative, ts, init_list, []);
+      }
+    });
+  },
+
+  filter_initiatives: function(deltas, initiative, ts, u_init_list, init_list) {
+    this._mask.msg = 'Filtering initiatives...';
+    this._mask.show();
+    var that = this;
+
+    var init = u_init_list.shift();
+
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['PortfolioItem/Feature'],
+      fetch: ['Name', 'Release'],
+      filters: [
+        {
+          property: 'Release.Name',
+          value: ts.record.raw.Name
+        },
+        {
+          property: 'Parent.FormattedID',
+          value: init.get('FormattedID')
+        }
+      ]
+    }, this);
+    var t1 = new Date();
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        var t2 = new Date();
+        console.log('Initiative filter query took', (t2 - t1), 'ms.');
+        if (operation.wasSuccessful() && records.length > 0) {
+          init_list.push(init.get('FormattedID') + ': ' + init.get('Name'));
+        }
+
+        if (u_init_list.length > 0) {
+          this.filter_initiatives(deltas, initiative, ts, u_init_list, init_list);
+        } else {
+          this.create_options(deltas, initiative, init_list);
+        }
       }
     });
   },
