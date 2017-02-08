@@ -68,47 +68,69 @@ Ext.define('ZzacksTeamDashboardApp', {
   },
 
   onSettingsUpdate: function(settings) {
-    if (
-      settings['Cycle Time Start State'] != this.cycle_time_start_state
-      || settings['Cycle Time End State'] != this.cycle_time_end_state
-    ) {
-      this.cycle_time_start_state = settings['Cycle Time Start State'];
-      this.cycle_time_end_state = settings['Cycle Time End State'];
-      this._mask.show();
-      this.ts = this.getContext().getTimeboxScope();
-      this.fetch_iterations(this.ts);
-    }
+    var that = this;
+    this.start(function() {
+      if (
+        settings['Cycle Time Start State'] != that.cycle_time_start_state
+        || settings['Cycle Time End State'] != that.cycle_time_end_state
+      ) {
+        that.cycle_time_start_state = settings['Cycle Time Start State'];
+        that.cycle_time_end_state = settings['Cycle Time End State'];
+        that._mask.show();
+        that.ts = that.getContext().getTimeboxScope();
+        that.fetch_iterations(that.ts);
+      }
+    });
   },
 
   launch: function() {
-    if (this.getSettings()['Cycle Time Start State']) {
-      this.cycle_time_start_state = this.getSettings()['Cycle Time Start State'];
-    } else {
-      this.getSettings()['Cycle Time Start State'] = this.cycle_time_start_state;
-    }
-    if (this.getSettings()['Cycle Time End State']) {
-      this.cycle_time_end_state = this.getSettings()['Cycle Time End State'];
-    } else {
-      this.getSettings()['Cycle Time End State'] = this.cycle_time_end_state;
-    }
+    var that = this;
+    this.start(function() {
+      if (that.getSettings()['Cycle Time Start State']) {
+        that.cycle_time_start_state = that.getSettings()['Cycle Time Start State'];
+      } else {
+        that.getSettings()['Cycle Time Start State'] = that.cycle_time_start_state;
+      }
+      if (that.getSettings()['Cycle Time End State']) {
+        that.cycle_time_end_state = that.getSettings()['Cycle Time End State'];
+      } else {
+        that.getSettings()['Cycle Time End State'] = that.cycle_time_end_state;
+      }
 
-    this._mask = new Ext.LoadMask(Ext.getBody(), {
-      msg: 'Please wait...'
+      that._mask = new Ext.LoadMask(Ext.getBody(), {
+        msg: 'Please wait...'
+      });
+      that._mask.show();
+      that.ts = that.getContext().getTimeboxScope();
+      that.fetch_iterations(that.ts);
     });
-    this._mask.show();
-    this.ts = this.getContext().getTimeboxScope();
-    this.fetch_iterations(this.ts);
   },
 
   onTimeboxScopeChange: function(ts) {
-    this._mask.show();
-    this.ts = ts;
-    this.fetch_iterations(ts);
+    var that = this;
+    this.start(function() {
+      that._mask.show();
+      that.ts = ts;
+      that.fetch_iterations(ts);
+    });
   },
 
   refresh: function() {
-    this.fetch_iterations(this.ts);
+    var that = this;
+    this.start(function() {
+      that.fetch_iterations(that.ts);
+    });
   },
+
+  start: function(call_thru) {
+    if (this.locked) {
+      alert("Please wait for the calculation to finish before starting a new calculation.\n\nIf you tried to change the timebox scope, you will need to re-select the scope you're trying to look at.");
+    } else {
+      this.locked = true;
+      call_thru();
+    }
+  },
+
 
   haltEarly: function(msg) {
     this._mask.hide();
@@ -583,6 +605,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     this.build_flow_dia(stories);
     this.build_kanban_dia(stories);
     this._mask.hide();
+    this.locked = false;
   },
 
   // Return a label for a particular data point.

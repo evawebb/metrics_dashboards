@@ -15,7 +15,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   onSettingsUpdate: function(settings) {
-    this.fetch_committed_features(this.ts);
+    var that = this;
+    this.start(function() {
+      that.fetch_committed_features(that.ts);
+    });
   },
 
   launch: function() {
@@ -27,8 +30,11 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     if (!this.getSettings().Initiative) {
       this.getSettings().Initiative = 'I4337';
     }
-    this.ts = this.getContext().getTimeboxScope();
-    this.fetch_committed_features(this.ts);
+    var that = this;
+    this.start(function() {
+      that.ts = that.getContext().getTimeboxScope();
+      that.fetch_committed_features(that.ts);
+    });
   },
 
   onTimeboxScopeChange: function(ts) {
@@ -37,12 +43,27 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     });
     this._mask.show();
 
-    this.ts = ts;
-    this.fetch_committed_features(ts);
+    var that = this;
+    this.start(function() {
+      that.ts = ts;
+      that.fetch_committed_features(ts);
+    });
   },
 
   refresh: function() {
-    this.fetch_committed_features(this.ts);
+    var that = this;
+    this.start(function() {
+      that.fetch_committed_features(that.ts);
+    });
+  },
+
+  start: function(call_thru) {
+    if (this.locked) {
+      alert("Please wait for the calculation to finish before starting a new calculation.\n\nIf you tried to change the timebox scope, you will need to re-select the scope you're trying to look at.");
+    } else {
+      this.locked = true;
+      call_thru();
+    }
   },
 
   haltEarly: function(msg) {
@@ -474,6 +495,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     });
 
     this._mask.hide();
+    this.locked = false;
   },
 
   change_graph_type: function(t, new_item, old_item, e) {

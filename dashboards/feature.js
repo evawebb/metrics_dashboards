@@ -23,18 +23,18 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
     this._mask.show();
 
-    this.ts = this.getContext().getTimeboxScope();
     var that = this;
     this.start(function() {
+      that.ts = that.getContext().getTimeboxScope();
       that.clean_cached_data(that.ts);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
-    this.ts = ts;
     var that = this;
     this.start(function() {
+      that.ts = ts;
       that.clean_cached_data(ts);
     });
   },
