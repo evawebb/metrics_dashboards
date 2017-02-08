@@ -3,6 +3,9 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   scopeType: 'release',
   drops: {},
   histories_cluster_size: 300,
+  update_interval: 1 * 60 * 60 * 1000,
+  // update_interval: 24 * 60 * 60 * 1000,
+  cache_tag: 'cached_data_i_',
 
   getUserSettingsFields: function() {
     return [{
@@ -17,7 +20,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   onSettingsUpdate: function(settings) {
     var that = this;
     this.start(function() {
-      that.fetch_committed_features(that.ts);
+      that.clean_cached_data(that.ts);
     });
   },
 
@@ -32,7 +35,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     var that = this;
     this.start(function() {
       that.ts = that.getContext().getTimeboxScope();
-      that.fetch_committed_features(that.ts);
+      that.clean_cached_data(that.ts);
     });
   },
 
@@ -45,7 +48,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     var that = this;
     this.start(function() {
       that.ts = ts;
-      that.fetch_committed_features(ts);
+      that.clean_cached_data(that.ts);
     });
   },
 
@@ -74,6 +77,69 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       html: 'Error: ' + msg
     });
     this.locked = false;
+  },
+
+  clean_cached_data: function(ts) {
+    var that = this;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        var stale = [];
+        Object.keys(prefs).forEach(function(p) {
+          if (p.substr(0, 14) == that.cache_tag) {
+            var last_update = new Date(JSON.parse(prefs[p]).date);
+            if (new Date() - last_update > that.update_interval) {
+              stale.push(p);
+            }
+          }
+        });
+
+        that.delete_prefs(stale, ts);
+      }
+    });
+  },
+
+  delete_prefs: function(stale, ts) {
+    if (stale.length > 0) {
+      var that = this;
+      Rally.data.PreferenceManager.remove({
+        appID: this.getAppId(),
+        filterByName: stale[0],
+        success: function() {
+          stale.shift();
+          that.delete_prefs(stale, ts);
+        }
+      });
+    } else {
+      this.check_cached_data(ts);
+    }
+  },
+
+  check_cached_data: function(ts) {
+    var that = this;
+    var release = ts.record.raw.Name;
+    var team = this.getContext().getProject().ObjectID;
+
+    Rally.data.PreferenceManager.load({
+      appID: this.getAppId(),
+      success: function(prefs) {
+        that.prefs = prefs;
+        var key = that.cache_tag + team + '_' + release;
+        console.log(prefs, key);
+        if (prefs[key]) {
+          var cd = JSON.parse(prefs[key]);
+          var last_update = new Date(cd.date);
+          if (new Date() - last_update < that.update_interval) {
+            that.create_options(cd.deltas, cd.initiative, cd.init_list);
+          } else {
+            that.fetch_committed_features(ts);
+          }
+        } else {
+          that.fetch_committed_features(ts);
+        }
+      }
+    });
   },
 
   fetch_committed_features: function(ts) {
@@ -409,7 +475,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           init_list = records;
         }
 
-        this.removeAll();
         that.filter_initiatives(deltas, initiative, ts, init_list, []);
       }
     });
@@ -449,14 +514,40 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         if (u_init_list.length > 0) {
           this.filter_initiatives(deltas, initiative, ts, u_init_list, init_list);
         } else {
-          this.create_options(deltas, initiative, init_list);
+          this.cache_data(deltas, initiative, init_list);
         }
+      }
+    });
+  },
+
+  cache_data: function(deltas, initiative, init_list) {
+    var that = this;
+    
+    var release = this.ts.record.raw.Name;
+    var team = this.getContext().getProject().ObjectID;
+    var key = this.cache_tag + team + '_' + release;
+    this.prefs[key] = JSON.stringify({
+      date: new Date(),
+      deltas: deltas,
+      initiative: initiative,
+      init_list: init_list
+    });
+    Rally.data.PreferenceManager.update({
+      appID: this.getAppId(),
+      settings: this.prefs,
+      success: function(response) {
+        if (response[0].errorMessages) {
+          console.log('Error saving preferences:', response[0].errorMessages);
+        }
+        that.create_options(deltas, initiative, init_list);
       }
     });
   },
 
   create_options: function(deltas, initiative, init_list) {
     var that = this;
+    this.removeAll();
+
     this.add_settings_link();
     this.change_init = false;
     this.add({
