@@ -262,7 +262,7 @@ Ext.define('ZzacksTeamDashboardApp', {
           if (success) {
             records.forEach(function(r) {
               that.kanban_states[r.get('ValueIndex')] = r.get('StringValue');
-              that.kanban_votes[r.get('StringValue')] = false;
+              that.kanban_votes[r.get('StringValue')] = 0;
             });
           } else {
             console.log(':(');
@@ -333,14 +333,15 @@ Ext.define('ZzacksTeamDashboardApp', {
                   to: d.get('c_KanbanState'),
                   on: d.get('_ValidFrom')
                 });
-                that.kanban_votes[d.get('_PreviousValues.c_KanbanState')] = true;
-                that.kanban_votes[d.get('c_KanbanState')] = true;
+                that.kanban_votes[d.get('_PreviousValues.c_KanbanState')] += 1;
+                that.kanban_votes[d.get('c_KanbanState')] += 1;
               }
             });
           }
 
           that.kanban_states = that.kanban_states.filter(function(k) {
-            return that.kanban_votes[k];
+            // return that.kanban_votes[k] > 0;
+            return that.kanban_votes[k] / stories.length > 0.25;
           });
 
           that.get_story_data(stories, []);
