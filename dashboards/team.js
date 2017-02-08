@@ -49,6 +49,18 @@ Ext.define('ZzacksTeamDashboardApp', {
   ],
   complete_dates: true,
   cycle_time_threshold: 25,
+  colors: [
+    '#4abdac',
+    '#fc4a1a',
+    '#f7b733',
+    '#dfdce3',
+    '#0375b4',
+    '#007849',
+    '#262228',
+    '#4717f6',
+    '#b82601',
+    '#a9a9a9'
+  ],
 
   getUserSettingsFields: function() {
     return [
@@ -920,11 +932,14 @@ Ext.define('ZzacksTeamDashboardApp', {
     }
 
     var series = [];
+    var i = 0;
     labels.forEach(function(dt) {
       series.push({
         name: dt.slice(0, -4),
-        data: mapped_series[dt]
+        data: mapped_series[dt],
+        color: that.colors[i]
       });
+      i += 1;
     });
 
     var chart = this.add({
@@ -1007,11 +1022,14 @@ Ext.define('ZzacksTeamDashboardApp', {
     }
 
     var series = [];
+    var i = 0;
     this.kanban_states.forEach(function(dt) {
       series.push({
         name: dt,
-        data: mapped_series[dt]
+        data: mapped_series[dt],
+        color: that.colors[i]
       });
+      i += 1;
     });
 
     var chart = this.add({
