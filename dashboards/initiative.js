@@ -27,9 +27,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     });
     this._mask.show();
 
-    if (!this.getSettings().Initiative) {
-      this.getSettings().Initiative = 'I4337';
-    }
+    this.Initiative = 'I4337';
+    this.InitiativeName = 'Inventory';
     var that = this;
     this.start(function() {
       that.ts = that.getContext().getTimeboxScope();
@@ -74,6 +73,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       xtype: 'component',
       html: 'Error: ' + msg
     });
+    this.locked = false;
   },
 
   fetch_committed_features: function(ts) {
@@ -81,7 +81,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this._mask.show();
 
     var that = this;
-    var initiative = this.getSettings().Initiative;
+    var initiative = this.Initiative;
     
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
@@ -383,13 +383,54 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       deltas[d_next].created_pts += deltas[d_prev].created_pts;
       deltas[d_next].created_stories += deltas[d_prev].created_stories;
     }
-    this.removeAll();
-    this.create_options(deltas, initiative);
+    this.fetch_initiatives(deltas, initiative, ts);
   },
 
-  create_options: function(deltas, initiative) {
+  fetch_initiatives: function(deltas, initiative, ts) {
+    var that = this;
+    
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['PortfolioItem/Initiative'],
+      fetch: ['Name', 'FormattedID'],
+      filters: [
+        {
+          property: 'LastUpdateDate',
+          operator: '>',
+          value: ts.record.raw.ReleaseStartDate
+        }
+      ]
+    }, this);
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        var init_list = [];
+        if (operation.wasSuccessful()) {
+          init_list = records.map(function(r) {
+            return r.get('FormattedID') + ': ' + r.get('Name');
+          });
+        }
+
+        this.removeAll();
+        that.create_options(deltas, initiative, init_list);
+      }
+    });
+  },
+
+  create_options: function(deltas, initiative, init_list) {
     var that = this;
     this.add_settings_link();
+    this.change_init = false;
+    this.add({
+      xtype: 'rallycombobox',
+      itemId: 'initiative_select',
+      fieldLabel: 'Initiative',
+      store: init_list,
+      value: this.Initiative + ': ' + this.InitiativeName,
+      listeners: { change: {
+        fn: that.change_initiative.bind(that)
+      }}
+    });
+    this.change_init = true;
     this.add({
       xtype: 'rallycombobox',
       itemId: 'graph_select',
@@ -480,7 +521,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       },
       chartConfig: Object.assign(
         {
-          title: { text: (points ? 'Points' : 'Stories/defects') + ' released for ' + initiative },
+          title: { text: (points ? 'Points' : 'Stories/defects') + ' released for ' + initiative + ': ' + this.InitiativeName },
           yAxis: { 
             title: { text: 'Total ' + (points ? 'points' : 'artifacts')},
             min: 0
@@ -505,16 +546,22 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     }
   },
 
+  change_initiative: function(t, new_item, old_item, e) {
+    if (this.change_init && old_item) {
+      var that = this;
+      this.start(function() {
+        var sp = new_item.split(':');
+        that.Initiative = sp[0];
+        that.InitiativeName = sp[1].slice(1)
+        that.fetch_committed_features(that.ts);
+      });
+    }
+  },
+
   add_settings_link: function() {
     this.add({
       xtype: 'component',
       html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_initiative()">Refresh this dashboard</a><hr />'
-    });
-    this.add({
-      xtype: 'component',
-      html: '<a href="javascript:;" onClick="' +
-            'Rally.getApp().showSettings()' +
-            '">Modify app settings</a><br />'
     });
   }
 });
