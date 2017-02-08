@@ -10,15 +10,12 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       html: 'Type the name or code of the initiative below, then select it from the dropdown.'
     }, {
       name: 'Initiative',
-      xtype: 'rallyartifactsearchcombobox',
-      storeConfig: {
-        models: ['PortfolioItem/Initiative']
-      }
+      xtype: 'rallytextfield'
     }];
   },
 
   onSettingsUpdate: function(settings) {
-    this.fetch_initiative(this.ts);
+    this.fetch_committed_features(this.ts);
   },
 
   launch: function() {
@@ -28,10 +25,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this._mask.show();
 
     if (!this.getSettings().Initiative) {
-      this.getSettings().Initiative = '/portfolioitem/initiative/44772028590';
+      this.getSettings().Initiative = 'I4337';
     }
     this.ts = this.getContext().getTimeboxScope();
-    this.fetch_initiative(this.ts);
+    this.fetch_committed_features(this.ts);
   },
 
   onTimeboxScopeChange: function(ts) {
@@ -41,11 +38,11 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this._mask.show();
 
     this.ts = ts;
-    this.fetch_initiative(ts);
+    this.fetch_committed_features(ts);
   },
 
   refresh: function() {
-    this.fetch_initiative(this.ts);
+    this.fetch_committed_features(this.ts);
   },
 
   haltEarly: function(msg) {
@@ -58,36 +55,12 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     });
   },
 
-  fetch_initiative: function(ts) {
-    this._mask.msg = 'Fetching initiative...';
-    this._mask.show();
-
-    var that = this;
-
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Initiative'],
-      filters: {
-        property: 'ObjectID',
-        value: parseInt(that.getSettings().Initiative.split('/').reverse()[0])
-      }
-    }, this);
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        if (operation.wasSuccessful() && records[0]) {
-          that.fetch_committed_features(records[0].data, ts);
-        } else {
-          that.haltEarly('Problem loading initiative.');
-        }
-      }
-    });
-  },
-
-  fetch_committed_features: function(initiative, ts) {
+  fetch_committed_features: function(ts) {
     this._mask.msg = 'Fetching features...';
     this._mask.show();
 
     var that = this;
+    var initiative = this.getSettings().Initiative;
     
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
@@ -99,7 +72,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         },
         {
           property: 'Parent.FormattedID',
-          value: initiative.FormattedID
+          value: initiative
         }
       ]
     }, this);
@@ -136,7 +109,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         },
         {
           property: 'Parent.FormattedID',
-          value: initiative.FormattedID
+          value: initiative
         }
       ]
     }, this);
@@ -486,7 +459,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       },
       chartConfig: Object.assign(
         {
-          title: { text: (points ? 'Points' : 'Stories/defects') + ' released for ' + initiative.FormattedID + ': ' + initiative.Name },
+          title: { text: (points ? 'Points' : 'Stories/defects') + ' released for ' + initiative },
           yAxis: { 
             title: { text: 'Total ' + (points ? 'points' : 'artifacts')},
             min: 0
