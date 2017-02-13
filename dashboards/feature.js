@@ -2,8 +2,8 @@ Ext.define('ZzacksFeatureDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
   color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
-  drops: {
-  },
+  drops: {},
+  drop_dates: {},
   histories_cluster_size: 300,
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
@@ -116,6 +116,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
             that.colors = cd.colors;
+            that.drop_dates = cd.drop_dates;
             that.releases = cd.releases;
             that.removeAll();
             that.create_options(cd.deltas, 'Total points');
@@ -232,7 +233,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'Release', 'ObjectID', 'RevisionHistory'],
+      fetch: ['Name', 'Release', 'ObjectID', 'FormattedID', 'RevisionHistory'],
       filters: [
         {
           property: 'Release.Name',
@@ -307,6 +308,8 @@ Ext.define('ZzacksFeatureDashboardApp', {
                 r.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
               that.drops[unsched_features[0].get('ObjectID')] = 
                 r.get('CreationDate').toDateString();
+              that.drop_dates[r.get('CreationDate').toDateString()] = 
+                unsched_features[0].get('FormattedID') + ': ' + unsched_features[0].get('Name');
             });
           }
         }
@@ -532,6 +535,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     this.prefs[key] = JSON.stringify({
       date: new Date(),
       colors: this.colors,
+      drop_dates: this.drop_dates,
       deltas: deltas,
       releases: this.releases
     });
@@ -595,13 +599,19 @@ Ext.define('ZzacksFeatureDashboardApp', {
           y: points ?
             deltas[release][d].rp :
             deltas[release][d].rs,
-          date: d
+          date: d,
+          drop: that.drop_dates[d] ?
+            '<b>' + that.drop_dates[d] + '</b> was unscheduled' :
+            ''
         });
         created_data.push({
           y: points ?
             deltas[release][d].cp :
             deltas[release][d].cs,
-          date: d
+          date: d,
+          drop: that.drop_dates[d] ?
+            '<b>' + that.drop_dates[d] + '</b> was unscheduled' :
+            ''
         });
       });
 
@@ -627,7 +637,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
       },
       tooltip: {
         headerFormat: '<span style="font-size: 10px">{series.name}</span><br/>',
-        pointFormat: '<b>{point.y} {unit}</b><br />on {point.date}'.replace('{unit}', points ? 'points' : 'artifacts')
+        pointFormat: '<b>{point.y} {unit}</b><br />on {point.date}<br />{point.drop}'.replace('{unit}', points ? 'points' : 'artifacts')
       },
       plotOptions: { line: {
         lineWidth: 3,

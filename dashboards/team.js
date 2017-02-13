@@ -1039,7 +1039,7 @@ Ext.define('ZzacksTeamDashboardApp', {
       chartData: { series: series, categories: categories },
       chartConfig: {
         chart: {
-          type: 'area'
+          type: 'areaspline'
         },
         title: { text: 'Kanban Cumulative Flow' },
         xAxis: { 
@@ -1048,7 +1048,7 @@ Ext.define('ZzacksTeamDashboardApp', {
         },
         yAxis: { title: { text: 'Total points' } },
         plotOptions: {
-          area: {
+          areaspline: {
             stacking: 'normal',
             lineColor: '#666666',
             lineWidth: 1,
