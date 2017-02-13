@@ -684,7 +684,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         var sp = new_item.split(':');
         that.Initiative = sp[0];
         that.InitiativeName = sp[1].slice(1)
-        that.fetch_committed_features(that.ts);
+        that.clean_cached_data(that.ts);
       });
     }
   },
