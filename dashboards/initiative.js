@@ -87,7 +87,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       success: function(prefs) {
         var stale = [];
         Object.keys(prefs).forEach(function(p) {
-          if (p.substr(0, 14) == that.cache_tag) {
+          if (p.substr(0, 11) == 'cached_data') {
             var last_update = new Date(JSON.parse(prefs[p]).date);
             if (new Date() - last_update > that.update_interval) {
               stale.push(p);
@@ -401,10 +401,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     }
     for (var d = new Date(ts.record.raw.ReleaseStartDate); d <= now; d.setDate(d.getDate() + 1)) {
       deltas[d.toDateString()] = {
-        released_pts: 0,
-        created_pts: 0,
-        released_stories: 0,
-        created_stories: 0
+        rp: 0,
+        cp: 0,
+        rs: 0,
+        cs: 0
       };
     }
 
@@ -414,29 +414,29 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       var drop = that.drops[s.get('Feature').ObjectID];
 
       if (r_date && deltas[r_date]) {
-        deltas[r_date].released_pts += s.get('PlanEstimate');
-        deltas[r_date].released_stories += 1;
+        deltas[r_date].rp += s.get('PlanEstimate');
+        deltas[r_date].rs += 1;
 
         if (drop && deltas[drop]) {
-          deltas[drop].released_pts -= s.get('PlanEstimate');
-          deltas[drop].released_stories -= 1;
+          deltas[drop].rp -= s.get('PlanEstimate');
+          deltas[drop].rs -= 1;
         }
       }
 
       if (c_date) {
         if (!drop || deltas[drop]) {
           if (deltas[c_date]) {
-            deltas[c_date].created_pts += s.get('PlanEstimate');
-            deltas[c_date].created_stories += 1;
+            deltas[c_date].cp += s.get('PlanEstimate');
+            deltas[c_date].cs += 1;
           } else {
-            deltas[Object.keys(deltas)[0]].created_pts += s.get('PlanEstimate');
-            deltas[Object.keys(deltas)[0]].created_stories += 1;
+            deltas[Object.keys(deltas)[0]].cp += s.get('PlanEstimate');
+            deltas[Object.keys(deltas)[0]].cs += 1;
           }
         }
 
         if (drop && deltas[drop]) {
-          deltas[drop].created_pts -= s.get('PlanEstimate');
-          deltas[drop].created_stories -= 1;
+          deltas[drop].cp -= s.get('PlanEstimate');
+          deltas[drop].cs -= 1;
         }
       }
     });
@@ -444,10 +444,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     for (var i = 0; i < Object.keys(deltas).length - 1; i += 1) {
       var d_prev = Object.keys(deltas)[i];
       var d_next = Object.keys(deltas)[i + 1];
-      deltas[d_next].released_pts += deltas[d_prev].released_pts;
-      deltas[d_next].released_stories += deltas[d_prev].released_stories;
-      deltas[d_next].created_pts += deltas[d_prev].created_pts;
-      deltas[d_next].created_stories += deltas[d_prev].created_stories;
+      deltas[d_next].rp += deltas[d_prev].rp;
+      deltas[d_next].rs += deltas[d_prev].rs;
+      deltas[d_next].cp += deltas[d_prev].cp;
+      deltas[d_next].cs += deltas[d_prev].cs;
     }
     this.fetch_initiatives(deltas, initiative, ts);
   },
@@ -459,6 +459,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       models: ['PortfolioItem/Initiative'],
       fetch: ['Name', 'FormattedID'],
       limit: 1000
+      // This is a quicker way to filter initiatives out of the dropdown.
       // filters: [
       //   {
       //     property: 'LastUpdateDate',
@@ -481,7 +482,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   filter_initiatives: function(deltas, initiative, ts, u_init_list, init_list) {
-    this._mask.msg = 'Filtering initiatives...';
+    this._mask.msg = 'Filtering initiatives... (' + u_init_list.length + ' initiatives left)';
     this._mask.show();
     var that = this;
 
@@ -599,15 +600,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     Object.keys(deltas).forEach(function(d) {
       released_data.push({
         y: points ?
-          deltas[d].released_pts :
-          deltas[d].released_stories,
+          deltas[d].rp :
+          deltas[d].rs,
         date: d,
         x: new Date(d).getTime()
       });
       created_data.push({
         y: points ?
-          deltas[d].created_pts :
-          deltas[d].created_stories,
+          deltas[d].cp :
+          deltas[d].cs,
         date: d,
         x: new Date(d).getTime()
       });

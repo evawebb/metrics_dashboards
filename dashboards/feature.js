@@ -72,7 +72,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
       success: function(prefs) {
         var stale = [];
         Object.keys(prefs).forEach(function(p) {
-          if (p.substr(0, 14) == that.cache_tag) {
+          if (p.substr(0, 11) == 'cached_data') {
             var last_update = new Date(JSON.parse(prefs[p]).date);
             if (new Date() - last_update > that.update_interval) {
               stale.push(p);
