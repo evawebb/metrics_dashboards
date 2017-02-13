@@ -487,24 +487,15 @@ Ext.define('ZzacksFeatureDashboardApp', {
 
         if (
           !drop ||
-          (drop && new Date(drop) >= new Date(first_date))
+          new Date(drop) >= new Date(first_date)
         ) {
-          if (r_date) {
-            if (deltas[release][r_date]) {
-              deltas[release][r_date].rp += s.get('PlanEstimate');
-              deltas[release][r_date].rs += 1;
-            } else if (new Date(r_date) < new Date(first_date)) {
-              deltas[release][first_date].rp += s.get('PlanEstimate');
-              deltas[release][first_date].rs += 1;
-            }
-
-            if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
-              deltas[release][drop].rp -= s.get('PlanEstimate');
-              deltas[release][drop].rs -= 1;
-            }
-          }
-
-          if (c_date) {
+          if (
+            c_date &&
+            (
+              !drop ||
+              new Date(drop) > new Date(c_date)
+            )
+          ) {
             if (deltas[release][c_date]) {
               deltas[release][c_date].cp += s.get('PlanEstimate');
               deltas[release][c_date].cs += 1;
@@ -516,6 +507,27 @@ Ext.define('ZzacksFeatureDashboardApp', {
             if (drop && deltas[release][drop] && new Date(drop) >= new Date(c_date)) {
               deltas[release][drop].cp -= s.get('PlanEstimate');
               deltas[release][drop].cs -= 1;
+            }
+          }
+
+          if (
+            r_date &&
+            (
+              !drop ||
+              new Date(drop) > new Date(r_date)
+            )
+          ) {
+            if (deltas[release][r_date]) {
+              deltas[release][r_date].rp += s.get('PlanEstimate');
+              deltas[release][r_date].rs += 1;
+            } else if (new Date(r_date) < new Date(first_date)) {
+              deltas[release][first_date].rp += s.get('PlanEstimate');
+              deltas[release][first_date].rs += 1;
+            }
+
+            if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
+              deltas[release][drop].rp -= s.get('PlanEstimate');
+              deltas[release][drop].rs -= 1;
             }
           }
         }
