@@ -331,12 +331,12 @@ Ext.define('ZzacksFeatureDashboardApp', {
   fetch_stories: function(features, stories, release_lookups) {
     this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
     this._mask.show();
+    var that = this;
 
     var feature_oids = features.splice(0, 50).map(function(f) {
       return f.get('ObjectID');
     });
 
-    var that = this;
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['UserStory', 'Defect'],
       filters: [
@@ -374,13 +374,13 @@ Ext.define('ZzacksFeatureDashboardApp', {
   fetch_histories: function(stories, index, release_dates, release_lookups) {
     this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
     this._mask.show();
+    var that = this;
 
     var story_oids = stories.slice(index, index + this.histories_cluster_size)
       .map(function(s) {
         return s.get('ObjectID');
       });
 
-    var that = this;
     var t1 = new Date();
     var store = Ext.create('Rally.data.lookback.SnapshotStore', {
       fetch: [
@@ -485,33 +485,38 @@ Ext.define('ZzacksFeatureDashboardApp', {
         var c_date = s.get('CreationDate').toDateString();
         var drop = that.drops[s.get('Feature').ObjectID];
 
-        if (r_date) {
-          if (deltas[release][r_date]) {
-            deltas[release][r_date].rp += s.get('PlanEstimate');
-            deltas[release][r_date].rs += 1;
-          } else if (new Date(r_date) < new Date(first_date)) {
-            deltas[release][first_date].rp += s.get('PlanEstimate');
-            deltas[release][first_date].rs += 1;
+        if (
+          !drop ||
+          (drop && new Date(drop) >= new Date(first_date))
+        ) {
+          if (r_date) {
+            if (deltas[release][r_date]) {
+              deltas[release][r_date].rp += s.get('PlanEstimate');
+              deltas[release][r_date].rs += 1;
+            } else if (new Date(r_date) < new Date(first_date)) {
+              deltas[release][first_date].rp += s.get('PlanEstimate');
+              deltas[release][first_date].rs += 1;
+            }
+
+            if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
+              deltas[release][drop].rp -= s.get('PlanEstimate');
+              deltas[release][drop].rs -= 1;
+            }
           }
 
-          if (drop && deltas[release][drop] && new Date(drop) >= new Date(r_date)) {
-            deltas[release][drop].rp -= s.get('PlanEstimate');
-            deltas[release][drop].rs -= 1;
-          }
-        }
+          if (c_date) {
+            if (deltas[release][c_date]) {
+              deltas[release][c_date].cp += s.get('PlanEstimate');
+              deltas[release][c_date].cs += 1;
+            } else if (new Date(c_date) < new Date(first_date)) {
+              deltas[release][first_date].cp += s.get('PlanEstimate');
+              deltas[release][first_date].cs += 1;
+            }
 
-        if (c_date) {
-          if (deltas[release][c_date]) {
-            deltas[release][c_date].cp += s.get('PlanEstimate');
-            deltas[release][c_date].cs += 1;
-          } else if (new Date(c_date) < new Date(first_date)) {
-            deltas[release][first_date].cp += s.get('PlanEstimate');
-            deltas[release][first_date].cs += 1;
-          }
-
-          if (drop && deltas[release][drop] && new Date(drop) >= new Date(c_date)) {
-            deltas[release][drop].cp -= s.get('PlanEstimate');
-            deltas[release][drop].cs -= 1;
+            if (drop && deltas[release][drop] && new Date(drop) >= new Date(c_date)) {
+              deltas[release][drop].cp -= s.get('PlanEstimate');
+              deltas[release][drop].cs -= 1;
+            }
           }
         }
       }
