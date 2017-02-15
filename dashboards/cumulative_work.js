@@ -180,7 +180,11 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
               r[t1] = 'Unscheduled story';
             }
 
-            r[t2] = full_feature.get('FormattedID');
+            var ffn = full_feature.get('Name');
+            if (ffn.length > 30) {
+              ffn = ffn.substr(0, 27) + '...';
+            }
+            r[t2] = full_feature.get('FormattedID') + ': ' + ffn;
           } else {
             r[t1] = 'Unscheduled story';
             r[t2] = 'No feature';
