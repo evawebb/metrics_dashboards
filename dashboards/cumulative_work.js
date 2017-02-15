@@ -74,7 +74,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: [type],
-      fetch: ['PlanEstimate', '_type', 'Tags', 'AcceptedDate'],
+      fetch: ['PlanEstimate', '_type', 'Tags', 'AcceptedDate', 'Feature'],
       filters: [
         {
           property: 'AcceptedDate',
@@ -97,34 +97,95 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
         console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
         if (operation.wasSuccessful()) {
-          records.forEach(function(r) {
-            if (r.get('_type') == 'hierarchicalrequirement') {
-              r.t = 'Story';
-            } else if (r.get('_type') == 'defect') {
-              var is_cv = r.get('Tags')._tagsNameArray.filter(function(o) {
-                return o.Name == 'Customer Voice';
-              }).length > 0;
-              var tag_names = r.get('Tags')._tagsNameArray.map(function(o) {
-                return o.Name;
-              });
-              if (is_cv) {
-                r.t = 'CV Defect';
-              } else {
-                r.t = 'Defect';
-              }
-            }
-          });
           artifacts = artifacts.concat(records);
           if (type == 'UserStory') {
             that.fetch_artifacts(artifacts, release, 'Defect');
           } else {
-            that.calculate_deltas(artifacts, release);
+            that.fetch_features(artifacts, release);
           }
         } else {
           that.haltEarly('No artifacts found for this release.');
         }
       }
     });
+  },
+
+  fetch_features: function(artifacts, release) {
+    this._mask.msg = 'Fetching features...';
+    this._mask.show();
+    var that = this;
+
+    var oids = [];
+    artifacts.forEach(function(s) {
+      if (s.get('Feature')) {
+        var this_oid = parseInt(s.get('Feature')._ref.split('/').reverse()[0]);
+        if (!oids.includes(this_oid)) {
+          oids.push(this_oid);
+        }
+      }
+    });
+
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['PortfolioItem/Feature'],
+      fetch: ['Name', 'ObjectID', 'Release'],
+      filters: [
+        {
+          property: 'ObjectID',
+          operator: 'in',
+          value: oids
+        }
+      ]
+    }, this);
+    var t1 = new Date();
+    store.load({
+      scope: this,
+      limit: 200,
+      callback: function(records, operation) {
+        var t2 = new Date();
+        console.log('Features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+        that.assign_types(artifacts, records, release);
+      }
+    });
+  },
+
+  assign_types: function(artifacts, features, release) {
+    artifacts.forEach(function(r) {
+      if (r.get('_type') == 'hierarchicalrequirement') {
+        var this_feature = r.get('Feature');
+        if (this_feature) {
+          var feature_name = this_feature._refObjectName;
+          var feature_release = features.filter(function(f) {
+            return f.get('Name') == feature_name;
+          })[0].get('Release');
+          if (feature_release) {
+            if (feature_release.Name == release.name) {
+              r.t = 'Scheduled story';
+            } else {
+              r.t = 'Unscheduled story';
+            }
+          } else {
+            r.t = 'Unscheduled story';
+          }
+        } else {
+          r.t = 'Unscheduled story';
+        }
+      } else if (r.get('_type') == 'defect') {
+        var is_cv = r.get('Tags')._tagsNameArray.filter(function(o) {
+          return o.Name == 'Customer Voice';
+        }).length > 0;
+        var tag_names = r.get('Tags')._tagsNameArray.map(function(o) {
+          return o.Name;
+        });
+        if (is_cv) {
+          r.t = 'CV defect';
+        } else {
+          r.t = 'Defect';
+        }
+      }
+    });
+
+    this.calculate_deltas(artifacts, release);
   },
 
   calculate_deltas: function(artifacts, release) {
