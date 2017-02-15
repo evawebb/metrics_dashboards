@@ -200,6 +200,10 @@ Ext.define('ZzacksAllWorkDashboardApp', {
           property: 'AcceptedDate',
           operator: '<',
           value: that.releases[release_index].end_date
+        },
+        {
+          property: 'DirectChildrenCount',
+          value: 0
         }
       ]
     }, this);
