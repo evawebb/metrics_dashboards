@@ -24,7 +24,8 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
         start_date: that.ts.record.raw.ReleaseStartDate,
         end_date: that.ts.record.raw.ReleaseDate
       };
-      that.fetch_artifacts([], that.release, 'UserStory');
+      that.graph_type = 'Total points';
+      that.fetch_artifacts([], that.release, 'UserStory', 'Artifact type');
     });
   },
 
@@ -38,14 +39,14 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
         start_date: that.ts.record.raw.ReleaseStartDate,
         end_date: that.ts.record.raw.ReleaseDate
       };
-      that.fetch_artifacts([], that.release, 'UserStory');
+      that.fetch_artifacts([], that.release, 'UserStory', 'Artifact type');
     });
   },
 
   refresh: function() {
     var that = this;
     this.start(function() {
-      that.fetch_artifacts([], that.release, 'UserStory');
+      that.fetch_artifacts([], that.release, 'UserStory', 'Artifact type');
     });
   },
 
@@ -63,8 +64,13 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
     this.removeAll();
     this.add({
       xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
+    });
+    this.add({
+      xtype: 'component',
       html: 'Error: ' + msg
     });
+    this.locked = false;
   },
 
   fetch_artifacts: function(artifacts, release, type) {
@@ -127,7 +133,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'ObjectID', 'Release'],
+      fetch: ['Name', 'ObjectID', 'Release', 'FormattedID'],
       filters: [
         {
           property: 'ObjectID',
@@ -151,24 +157,37 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
 
   assign_types: function(artifacts, features, release) {
     artifacts.forEach(function(r) {
+      var t1 = 't_Artifact type';
+      var t2 = 't_Feature';
+
       if (r.get('_type') == 'hierarchicalrequirement') {
         var this_feature = r.get('Feature');
         if (this_feature) {
           var feature_name = this_feature._refObjectName;
-          var feature_release = features.filter(function(f) {
+          var full_feature = features.filter(function(f) {
             return f.get('Name') == feature_name;
-          })[0].get('Release');
-          if (feature_release) {
-            if (feature_release.Name == release.name) {
-              r.t = 'Scheduled story';
+          })[0];
+
+          if (full_feature) {
+            var feature_release = full_feature.get('Release');
+            if (feature_release) {
+              if (feature_release.Name == release.name) {
+                r[t1] = 'Scheduled story';
+              } else {
+                r[t1] = 'Unscheduled story';
+              }
             } else {
-              r.t = 'Unscheduled story';
+              r[t1] = 'Unscheduled story';
             }
+
+            r[t2] = full_feature.get('FormattedID');
           } else {
-            r.t = 'Unscheduled story';
+            r[t1] = 'Unscheduled story';
+            r[t2] = 'No feature';
           }
         } else {
-          r.t = 'Unscheduled story';
+          r[t1] = 'Unscheduled story';
+          r[t2] = 'No feature';
         }
       } else if (r.get('_type') == 'defect') {
         var is_cv = r.get('Tags')._tagsNameArray.filter(function(o) {
@@ -178,17 +197,50 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
           return o.Name;
         });
         if (is_cv) {
-          r.t = 'CV defect';
+          r[t1] = 'CV defect';
+          r[t2] = 'CV defect';
         } else {
-          r.t = 'Defect';
+          r[t1] = 'Defect';
+          r[t2] = 'Defect';
         }
       }
     });
 
-    this.calculate_deltas(artifacts, release);
+    this.removeAll();
+    this.create_options(artifacts, release);
   },
 
-  calculate_deltas: function(artifacts, release) {
+  create_options: function(artifacts, release) {
+    var that = this;
+    this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
+    });
+    this.add({
+      xtype: 'rallycombobox',
+      itemId: 'split_select',
+      fieldLabel: 'Categorize artifacts by:',
+      store: ['Artifact type', 'Feature'],
+      listeners: { change: {
+        fn: that.change_split_type.bind(that)
+      }}
+    });
+    this.add({
+      xtype: 'rallycombobox',
+      itemId: 'graph_select',
+      fieldLabel: 'Y-axis:',
+      store: ['Total points', 'Total stories/defects'],
+      listeners: { change: {
+        fn: that.change_graph_type.bind(that)
+      }}
+    });
+
+    this.artifacts = artifacts;
+    this.release = release;
+    this.calculate_deltas(artifacts, release, 'Artifact type');
+  },
+
+  calculate_deltas: function(artifacts, release, split_type) {
     this._mask.msg = 'Calculating release deltas...';
     this._mask.show();
     var that = this;
@@ -208,9 +260,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
     var types = [];
     artifacts.forEach(function(s) {
       var a_date = s.get('AcceptedDate').toDateString();
-      var type = s.t;
-      //var type = s.get('_type');
-      // change type here to color-code by feature
+      var type = s['t_' + split_type];
 
       if (!types.includes(type)) {
         types.push(type);
@@ -248,31 +298,15 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
       });
     }
 
-    that.removeAll();
-    that.create_options(deltas, types);
+    if (types.length < 10) {
+      that.deltas = deltas;
+      that.types = types;
+      that.build_charts(deltas, types, that.graph_type);
+    } else {
+      that.haltEarly('Too many categories!');
+    }
   },
   
-  create_options: function(deltas, types) {
-    var that = this;
-    this.add({
-      xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
-    });
-    this.add({
-      xtype: 'rallycombobox',
-      itemId: 'graph_select',
-      fieldLabel: 'Y-axis:',
-      store: ['Total points', 'Total stories/defects'],
-      listeners: { change: {
-        fn: that.change_graph_type.bind(that)
-      }}
-    });
-
-    that.deltas = deltas;
-    that.types = types;
-    that.build_charts(deltas, types, 'Total points');
-  },
-
   build_charts: function(deltas, types, graph_type) {
     this._mask.msg = 'Building chart...';
     this._mask.show();
@@ -356,6 +390,16 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
       this.graph_type = new_item;
       this.remove(this.chart);
       this.build_charts(this.deltas, this.types, new_item);
+    }
+  },
+  
+  change_split_type: function(t, new_item, old_item, e) {
+    if (old_item) {
+      var that = this;
+      this.start(function() {
+        that.remove(that.chart);
+        that.calculate_deltas(that.artifacts, that.release, new_item);
+      });
     }
   }
 });
