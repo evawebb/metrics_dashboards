@@ -3,7 +3,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
   scopeType: 'release',
   color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
   drops: {},
-  histories_cluster_size: 300,
+  histories_cluster_size: 200,
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
   cache_tag: 'cached_data_f_',

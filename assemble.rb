@@ -7,12 +7,13 @@ program_out = File.open("templates/program.html", "r").read
 just_team_out = File.open("templates/just_team.html", "r").read
 
 all_work = File.open("dashboards/all_work.js", "r").read
+cumulative_work = File.open("dashboards/cumulative_work.js", "r").read
 feature = File.open("dashboards/feature.js", "r").read
 initiative = File.open("dashboards/initiative.js", "r").read
 team = File.open("dashboards/team.js", "r").read
 weekly = File.open("dashboards/weekly_throughput.js", "r").read
 
-team_dashboards = [all_work, team, weekly].join("\n")
+team_dashboards = [all_work, cumulative_work, team, weekly].join("\n")
 program_dashboards = [all_work, feature, initiative, weekly].join("\n")
 
 team_menu = File.open("menus/team.html", "r").read
