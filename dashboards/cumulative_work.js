@@ -2,16 +2,26 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
   colors: [
-    '#4abdac',
-    '#fc4a1a',
-    '#f7b733',
-    '#dfdce3',
-    '#0375b4',
-    '#007849',
-    '#262228',
-    '#4717f6',
-    '#b82601',
-    '#a9a9a9'
+    '#ffb300',
+    '#803e75',
+    '#ff6800',
+    '#a6bdd7',
+    '#c10020',
+    '#cea262',
+    '#817066',
+    '#007d34',
+    '#f6768e',
+    '#00538a',
+    '#ff7a5c',
+    '#53377a',
+    '#ff8e00',
+    '#b32851',
+    '#f4c800',
+    '#7f180d',
+    '#93aa00',
+    '#593315',
+    '#f13a13',
+    '#232c16'
   ],
   
   getUserSettingsFields: function() {
@@ -295,6 +305,20 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
       }
     });
 
+    var bubble_downs = [
+      'Defect',
+      'CV defect',
+      'Unscheduled story',
+      'No feature'
+    ];
+    bubble_downs.forEach(function(t) {
+      for (var i = types.length - 1; i > 0; i -= 1) {
+        if (types[i] == t) {
+          types.splice(i - 1, 0, types.splice(i, 1)[0]);
+        }
+      }
+    });
+
     Object.keys(deltas).forEach(function(d) {
       types.forEach(function(t) {
         if (!deltas[d].ap[t]) {
@@ -314,7 +338,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
       });
     }
 
-    if (types.length < 10) {
+    if (types.length <= that.colors.length) {
       that.deltas = deltas;
       that.types = types;
       that.build_charts(deltas, types, that.graph_type);
