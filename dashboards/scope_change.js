@@ -1,6 +1,7 @@
 Ext.define('ZzacksScopeChangeDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
+  histories_cluster_size: 200,
 
   getUserSettingsFields: function() {
     return [];
@@ -16,7 +17,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     });
     this._mask.show();
 
-    var release = this.getContext().getTimeboxScope().record.raw.Name;
+    var release = this.getContext().getTimeboxScope();
     var that = this;
     this.start(function() {
       that.fetch_features(release);
@@ -63,7 +64,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       filters: [
         {
           property: 'Release.Name',
-          value: release
+          value: release.record.raw.Name
         }
       ]
     }, this);
@@ -79,13 +80,13 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
             data[f.get('FormattedID')] = {
               name: f.get('Name'),
               scope_est: f.get('RefinedEstimate'),
+              scope_est_h: 0,
               scope_act: 0,
               scope_chg: -f.get('RefinedEstimate')
             };
           });
 
-          that.fetch_stories(records, data);
-          // that.build_table(data);
+          that.fetch_stories(release, records, data, []);
         } else {
           that.haltEarly('No features found.');
         }
@@ -93,7 +94,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     });
   },
 
-  fetch_stories: function(features, data) {
+  fetch_stories: function(release, features, data, stories) {
     this._mask.msg = 'Fetching stories...';
     this._mask.show();
 
@@ -134,15 +135,77 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               console.log('Weird story!', s);
             }
           });
+          stories = stories.concat(records);
+        }
 
-          if (features.length == 0) {
+        if (features.length == 0) {
+          that.fetch_historical_estimates(release, stories, data);
+        } else {
+          that.fetch_stories(release, features, data, stories);
+        }
+      }
+    });
+  },
+
+  fetch_historical_estimates: function(release, stories, data) {
+    this._mask.msg = 'Fetching feature estimates... (' + stories.length + ' stories left)';
+    this._mask.show();
+
+    var that = this;
+
+    var story_oids = stories.splice(0, this.histories_cluster_size);
+    var feature_fids = {};
+    story_oids.forEach(function(s) {
+      feature_fids[s.get('ObjectID')] = s.get('Feature').FormattedID;
+    });
+    story_oids = story_oids.map(function(s) {
+      return s.get('ObjectID');
+    });
+
+    var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+      fetch: ['Name', 'FormattedID', 'PlanEstimate', 'Feature'],
+      hydrate: ['Feature'],
+      filters: [
+        {
+          property: 'ObjectID',
+          operator: 'in',
+          value: story_oids
+        },
+        {
+          property: '_ValidFrom',
+          operator: '>',
+          value: release.record.raw.ReleaseStartDate
+        },
+        {
+          property: '_ValidFrom',
+          operator: '<',
+          value: release.record.raw.ReleaseDate
+        }
+      ],
+      listeners: {
+        load: function(store, lb_data, success) {
+          var done = {};
+          lb_data.forEach(function(m) {
+            if (
+              !done[m.get('ObjectID')] &&
+              m.get('Feature') &&
+              feature_fids[m.get('ObjectID')] &&
+              data[feature_fids[m.get('ObjectID')]]
+            ) {
+              data[feature_fids[m.get('ObjectID')]].scope_est_h += m.get('PlanEstimate');
+              done[m.get('ObjectID')] = true;
+            }
+          });
+              
+          if (stories.length == 0) {
             that.build_table(data, that.sort_data(Object.keys(data), data));
           } else {
-            that.fetch_stories(features, data);
+            that.fetch_historical_estimates(release, stories, data);
           }
         }
       }
     });
+    store.load({ scope: this });
   },
 
   sort_data: function(fids, data) {
@@ -178,6 +241,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       '<th class="bold tablecell">Formatted ID</th>' +
       '<th class="bold tablecell">Name</th>' + 
       '<th class="bold tablecell">Refined Estimate</th>' + 
+      '<th class="bold tablecell">Refined Estimate (LBAPI)</th>' +
       '<th class="bold tablecell">Actual Scope</th>' +
       '<th class="bold tablecell">Scope Change</th>' +
       '</tr></thead>';
@@ -190,6 +254,8 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       table += data[fid].name + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_est + '</td>';
+      table += '<td class="tablecell center">';
+      table += data[fid].scope_est_h + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_act + '</td>';
       table += '<td class="tablecell center">';
