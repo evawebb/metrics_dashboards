@@ -148,7 +148,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
     var that = this;
     var initiative = this.Initiative;
-    
+
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
       fetch: ['Name', 'Release'],

@@ -10,11 +10,12 @@ all_work = File.open("dashboards/all_work.js", "r").read
 cumulative_work = File.open("dashboards/cumulative_work.js", "r").read
 feature = File.open("dashboards/feature.js", "r").read
 initiative = File.open("dashboards/initiative.js", "r").read
+scope_change = File.open("dashboards/scope_change.js", "r").read
 team = File.open("dashboards/team.js", "r").read
 weekly = File.open("dashboards/weekly_throughput.js", "r").read
 
 team_dashboards = [all_work, cumulative_work, team, weekly].join("\n")
-program_dashboards = [all_work, feature, initiative, weekly].join("\n")
+program_dashboards = [all_work, feature, initiative, scope_change, weekly].join("\n")
 
 team_menu = File.open("menus/team.html", "r").read
   .gsub("\"", "\\\"")

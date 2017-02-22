@@ -20,6 +20,10 @@
         Rally.getApp('ZzacksWeeklyThroughputDashboardApp').refresh();
       }
 
+      function refresh_scope_change() {
+        Rally.getApp('ZzacksScopeChangeDashboardApp').refresh();
+      }
+
       function load_menu() {
         var b = document.getElementById("the_body");
         b.innerHTML = "<!-- put the menu here -->";
