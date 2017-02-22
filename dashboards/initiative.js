@@ -125,8 +125,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       appID: this.getAppId(),
       success: function(prefs) {
         that.prefs = prefs;
-        var key = that.cache_tag + team + '_' + release;
-        console.log(prefs, key);
+        var key = that.cache_tag + team + '_' + release + '_' + that.Initiative;
+
         if (prefs[key]) {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
@@ -526,7 +526,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     
     var release = this.ts.record.raw.Name;
     var team = this.getContext().getProject().ObjectID;
-    var key = this.cache_tag + team + '_' + release;
+    var key = this.cache_tag + team + '_' + release + '_' + that.Initiative;
     this.prefs[key] = JSON.stringify({
       date: new Date(),
       deltas: deltas,
