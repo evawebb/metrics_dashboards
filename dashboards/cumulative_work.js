@@ -1,6 +1,18 @@
 Ext.define('ZzacksCumulativeWorkDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
+  colors: [
+    '#4abdac',
+    '#fc4a1a',
+    '#f7b733',
+    '#dfdce3',
+    '#0375b4',
+    '#007849',
+    '#262228',
+    '#4717f6',
+    '#b82601',
+    '#a9a9a9'
+  ],
   
   getUserSettingsFields: function() {
     return [];
@@ -319,6 +331,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
     var points = graph_type == 'Total points';
 
     var series = [];
+    var i = 0;
     types.forEach(function(t) {
       var data = [];
 
@@ -334,8 +347,10 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
 
       series.push({
         name: t,
-        data: data
+        data: data,
+        color: that.colors[i]
       });
+      i += 1;
     });
 
     var chart_config = {
