@@ -20,14 +20,24 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     var release = this.getContext().getTimeboxScope();
     var that = this;
     this.start(function() {
+      that.release = release;
       that.fetch_features(release);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
+    var that = this;
+    this.start(function() {
+      that.release = ts;
+      that.fetch_features(that.release);
+    });
   },
 
   refresh: function() {
+    var that = this;
+    this.start(function() {
+      that.fetch_features(that.release);
+    });
   },
 
   start: function(call_thru) {
@@ -299,6 +309,10 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
 
     table += '</table>';
 
+    this.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
+    });
     this.add({
       xtype: 'component',
       html: table

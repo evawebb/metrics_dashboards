@@ -18,10 +18,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   onSettingsUpdate: function(settings) {
-    var that = this;
-    this.start(function() {
-      that.clean_cached_data(that.ts);
-    });
+    console.log('Settings update:', settings);
   },
 
   launch: function() {
@@ -137,6 +134,9 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       success: function(prefs) {
         that.prefs = prefs;
         var key = that.cache_tag + team + '_' + release + '_' + that.Initiative;
+        console.log(key);
+        console.log(that.Initiative, ':', that.InitiativeName);
+        console.log(Object.keys(prefs));
 
         if (prefs[key]) {
           var cd = JSON.parse(prefs[key]);
