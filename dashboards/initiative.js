@@ -30,8 +30,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     });
     this._mask.show();
 
-    this.Initiative = 'I4337';
-    this.InitiativeName = 'Inventory';
     var that = this;
     this.start(function() {
       that.ts = that.getContext().getTimeboxScope();
@@ -55,7 +53,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   refresh: function() {
     var that = this;
     this.start(function() {
-      that.fetch_committed_features(that.ts);
+      that.fetch_initiatives(that.ts);
     });
   },
 
@@ -131,22 +129,102 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
+            var sp = cd.init_list[0].split(':');
+            that.Initiative = sp[0];
+            that.InitiativeName = sp[1].slice(1)
             that.create_options(cd.deltas, cd.initiative, cd.init_list);
           } else {
-            that.fetch_committed_features(ts);
+            that.fetch_initiatives(ts);
           }
         } else {
-          that.fetch_committed_features(ts);
+          that.fetch_initiatives(ts);
         }
       }
     });
   },
 
-  fetch_committed_features: function(ts) {
+  fetch_initiatives: function(ts) {
+    var that = this;
+
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['PortfolioItem/Initiative'],
+      fetch: ['Name', 'FormattedID'],
+      limit: 1000
+      // This is a quicker way to filter initiatives out of the dropdown.
+      // filters: [
+      //   {
+      //     property: 'LastUpdateDate',
+      //     operator: '>',
+      //     value: ts.record.raw.ReleaseStartDate
+      //   }
+      // ]
+    }, this);
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        var init_list = [];
+        if (operation.wasSuccessful()) {
+          init_list = records;
+        }
+
+        that.filter_initiatives(ts, init_list, []);
+      }
+    });
+  },
+
+  filter_initiatives: function(ts, u_init_list, init_list) {
+    this._mask.msg = 'Filtering initiatives... (' + u_init_list.length + ' initiatives left)';
+    this._mask.show();
+    var that = this;
+
+    var init = u_init_list.shift();
+
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['PortfolioItem/Feature'],
+      fetch: ['Name', 'Release'],
+      filters: [
+        {
+          property: 'Release.Name',
+          value: ts.record.raw.Name
+        },
+        {
+          property: 'Parent.FormattedID',
+          value: init.get('FormattedID')
+        }
+      ]
+    }, this);
+    var t1 = new Date();
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        var t2 = new Date();
+        console.log('Initiative filter query took', (t2 - t1), 'ms.');
+        if (operation.wasSuccessful() && records.length > 0) {
+          init_list.push(init.get('FormattedID') + ': ' + init.get('Name'));
+        }
+
+        if (u_init_list.length > 0) {
+          this.filter_initiatives(ts, u_init_list, init_list);
+        } else {
+          this.fetch_committed_features(ts, init_list);
+        }
+      }
+    });
+  },
+
+  fetch_committed_features: function(ts, init_list) {
     this._mask.msg = 'Fetching features...';
     this._mask.show();
 
     var that = this;
+
+    if (init_list.length > 0) {
+      var sp = init_list[0].split(':');
+      that.Initiative = sp[0];
+      that.InitiativeName = sp[1].slice(1)
+    } else {
+      that.haltEarly("No initiatives found.");
+    }
     var initiative = this.Initiative;
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
@@ -171,16 +249,16 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
         if (operation.wasSuccessful()) {
           if (records.length > 0) {
-            that.fetch_unscheduled_features(records, initiative, ts);
+            that.fetch_unscheduled_features(records, initiative, ts, init_list);
           } else {
-            that.fetch_initiatives({}, initiative, ts);
+            that.cache_data({}, initiative, init_list);
           }
         }
       }
     });
   },
 
-  fetch_unscheduled_features: function(features, initiative, ts) {
+  fetch_unscheduled_features: function(features, initiative, ts, init_list) {
     this._mask.msg = 'Fetching unscheduled features...';
     this._mask.show();
     var that = this;
@@ -208,15 +286,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
         if (records && records.length > 0) {
-          this.fetch_unschedule_dates(features, records, initiative, ts);
+          this.fetch_unschedule_dates(features, records, initiative, ts, init_list);
         } else {
-          this.fetch_stories(features, [], initiative, ts);
+          this.fetch_stories(features, [], initiative, ts, init_list);
         }
       }
     });
   },
 
-  fetch_unschedule_dates(features, unsched_features, initiative, ts) {
+  fetch_unschedule_dates(features, unsched_features, initiative, ts, init_list) {
     this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_features.length + ' features left)';
     this._mask.show();
     var that = this;
@@ -271,15 +349,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         }
 
         if (unsched_features.length > 0) {
-          this.fetch_unschedule_dates(features, unsched_features, initiative, ts);
+          this.fetch_unschedule_dates(features, unsched_features, initiative, ts, init_list);
         } else {
-          this.fetch_stories(features, [], initiative, ts);
+          this.fetch_stories(features, [], initiative, ts, init_list);
         }
       }
     });
   },
 
-  fetch_stories: function(features, stories, initiative, ts) {
+  fetch_stories: function(features, stories, initiative, ts, init_list) {
     this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
     this._mask.show();
 
@@ -310,15 +388,15 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         features.shift();
 
         if (features.length > 0) {
-          this.fetch_stories(features, stories, initiative, ts);
+          this.fetch_stories(features, stories, initiative, ts, init_list);
         } else {
-          this.fetch_histories(stories, 0, {}, initiative, ts);
+          this.fetch_histories(stories, 0, {}, initiative, ts, init_list);
         }
       }
     });
   },
 
-  fetch_histories: function(stories, index, release_dates, initiative, ts) {
+  fetch_histories: function(stories, index, release_dates, initiative, ts, init_list) {
     this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
     this._mask.show();
 
@@ -374,14 +452,16 @@ Ext.define('ZzacksInitiativeDashboardApp', {
                 index + that.histories_cluster_size, 
                 release_dates,
                 initiative,
-                ts
+                ts,
+                init_list
               );
             } else {
               that.construct_series(
                 release_dates, 
                 stories,
                 initiative,
-                ts
+                ts,
+                init_list
               );
             }
           }
@@ -392,7 +472,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     store.load({ scope: this });
   },
 
-  construct_series: function(release_dates, stories, initiative, ts) {
+  construct_series: function(release_dates, stories, initiative, ts, init_list) {
     var that = this;
     var deltas = {};
     var now = new Date();
@@ -449,76 +529,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       deltas[d_next].cp += deltas[d_prev].cp;
       deltas[d_next].cs += deltas[d_prev].cs;
     }
-    this.fetch_initiatives(deltas, initiative, ts);
-  },
-
-  fetch_initiatives: function(deltas, initiative, ts) {
-    var that = this;
-    
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Initiative'],
-      fetch: ['Name', 'FormattedID'],
-      limit: 1000
-      // This is a quicker way to filter initiatives out of the dropdown.
-      // filters: [
-      //   {
-      //     property: 'LastUpdateDate',
-      //     operator: '>',
-      //     value: ts.record.raw.ReleaseStartDate
-      //   }
-      // ]
-    }, this);
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var init_list = [];
-        if (operation.wasSuccessful()) {
-          init_list = records;
-        }
-
-        that.filter_initiatives(deltas, initiative, ts, init_list, []);
-      }
-    });
-  },
-
-  filter_initiatives: function(deltas, initiative, ts, u_init_list, init_list) {
-    this._mask.msg = 'Filtering initiatives... (' + u_init_list.length + ' initiatives left)';
-    this._mask.show();
-    var that = this;
-
-    var init = u_init_list.shift();
-
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'Release'],
-      filters: [
-        {
-          property: 'Release.Name',
-          value: ts.record.raw.Name
-        },
-        {
-          property: 'Parent.FormattedID',
-          value: init.get('FormattedID')
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Initiative filter query took', (t2 - t1), 'ms.');
-        if (operation.wasSuccessful() && records.length > 0) {
-          init_list.push(init.get('FormattedID') + ': ' + init.get('Name'));
-        }
-
-        if (u_init_list.length > 0) {
-          this.filter_initiatives(deltas, initiative, ts, u_init_list, init_list);
-        } else {
-          this.cache_data(deltas, initiative, init_list);
-        }
-      }
-    });
+    this.cache_data(deltas, initiative, init_list);
   },
 
   cache_data: function(deltas, initiative, init_list) {
