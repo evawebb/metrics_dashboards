@@ -114,6 +114,19 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     }
   },
 
+  check_initiative: function(init_list) {
+    if (init_list.length > 0) {
+      var existing_initiative = this.Initiative + ': ' + this.InitiativeName;
+      if (!init_list.includes(existing_initiative)) {
+        var sp = init_list[0].split(':');
+        this.Initiative = sp[0];
+        this.InitiativeName = sp[1].slice(1)
+      }
+    } else {
+      this.haltEarly("No initiatives found.");
+    }
+  },
+
   check_cached_data: function(ts) {
     var that = this;
     var release = ts.record.raw.Name;
@@ -129,9 +142,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
-            var sp = cd.init_list[0].split(':');
-            that.Initiative = sp[0];
-            that.InitiativeName = sp[1].slice(1)
+            that.check_initiative(cd.init_list);
             that.create_options(cd.deltas, cd.initiative, cd.init_list);
           } else {
             that.fetch_initiatives(ts);
@@ -218,13 +229,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
     var that = this;
 
-    if (init_list.length > 0) {
-      var sp = init_list[0].split(':');
-      that.Initiative = sp[0];
-      that.InitiativeName = sp[1].slice(1)
-    } else {
-      that.haltEarly("No initiatives found.");
-    }
+    this.check_initiative(init_list);
     var initiative = this.Initiative;
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
