@@ -236,7 +236,8 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
 
     var that = this;
 
-    var table = '<table class="center">' +
+    var table = '<div class="center title">Scope Change by Feature</div>' +
+      '<table class="center">' +
       '<thead><tr>' + 
       '<th class="bold tablecell">Formatted ID</th>' +
       '<th class="bold tablecell">Name</th>' + 
@@ -244,8 +245,15 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       '<th class="bold tablecell">Refined Estimate (LBAPI)</th>' +
       '<th class="bold tablecell">Actual Scope</th>' +
       '<th class="bold tablecell">Scope Change</th>' +
+      '<th class="bold tablecell">Percent Scope Change</th>' +
       '</tr></thead>';
 
+    var totals = {
+      scope_est: 0,
+      scope_est_h: 0,
+      scope_act: 0,
+      scope_chg: 0
+    };
     fids.forEach(function(fid) {
       table += '<tr>';
       table += '<td class="tablecell center">';
@@ -260,8 +268,34 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       table += data[fid].scope_act + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_chg + '</td>';
+      table += '<td class="tablecell center">';
+      if (data[fid].scope_est > 0) {
+        table += (data[fid].scope_chg / data[fid].scope_est * 100).toFixed(2) + '%</td>';
+      } else {
+        table += '</td>';
+      }
       table += '</tr>';
+
+      Object.keys(totals).forEach(function(k) {
+        totals[k] += data[fid][k];
+      });
     });
+    table += '<tr>';
+    table += '<td class="tablecell bold">';
+    table += '</td>';
+    table += '<td class="tablecell bold">';
+    table += 'Total</td>';
+    table += '<td class="tablecell bold">';
+    table += totals.scope_est + '</td>';
+    table += '<td class="tablecell bold">';
+    table += totals.scope_est_h + '</td>';
+    table += '<td class="tablecell bold">';
+    table += totals.scope_act + '</td>';
+    table += '<td class="tablecell bold">';
+    table += totals.scope_chg + '</td>';
+    table += '<td class="tablecell bold">';
+    table += (totals.scope_chg / totals.scope_est * 100).toFixed(2) + '%</td>';
+    table += '</tr>';
 
     table += '</table>';
 
