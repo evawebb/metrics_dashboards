@@ -194,12 +194,12 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
             var feature_release = full_feature.get('Release');
             if (feature_release) {
               if (feature_release.Name == release.name) {
-                r[t1] = 'Scheduled story';
+                r[t1] = 'Feature story';
               } else {
-                r[t1] = 'Unscheduled story';
+                r[t1] = 'Unparented story';
               }
             } else {
-              r[t1] = 'Unscheduled story';
+              r[t1] = 'Unparented story';
             }
 
             var ffn = full_feature.get('Name');
@@ -208,11 +208,11 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
             }
             r[t2] = full_feature.get('FormattedID') + ': ' + ffn;
           } else {
-            r[t1] = 'Unscheduled story';
+            r[t1] = 'Unparented story';
             r[t2] = 'No feature';
           }
         } else {
-          r[t1] = 'Unscheduled story';
+          r[t1] = 'Unparented story';
           r[t2] = 'No feature';
         }
       } else if (r.get('_type') == 'defect') {
@@ -308,7 +308,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
     var bubble_downs = [
       'Defect',
       'CV defect',
-      'Unscheduled story',
+      'Unparented story',
       'No feature'
     ];
     bubble_downs.forEach(function(t) {
