@@ -134,10 +134,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       success: function(prefs) {
         that.prefs = prefs;
         var key = that.cache_tag + team + '_' + release + '_' + that.Initiative;
-        console.log(key);
-        console.log(that.Initiative, ':', that.InitiativeName);
-        console.log(Object.keys(prefs));
-
         if (prefs[key]) {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
