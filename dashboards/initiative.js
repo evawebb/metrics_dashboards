@@ -490,34 +490,55 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     }
 
     stories.forEach(function(s) {
+      var first_date = Object.keys(deltas)[0];
       var r_date = release_dates[s.get('FormattedID')];
       var c_date = s.get('CreationDate').toDateString();
       var drop = that.drops[s.get('Feature').ObjectID];
 
-      if (r_date && deltas[r_date]) {
-        deltas[r_date].rp += s.get('PlanEstimate');
-        deltas[r_date].rs += 1;
-
-        if (drop && deltas[drop]) {
-          deltas[drop].rp -= s.get('PlanEstimate');
-          deltas[drop].rs -= 1;
-        }
-      }
-
-      if (c_date) {
-        if (!drop || deltas[drop]) {
+      if (
+        !drop ||
+        new Date(drop) >= new Date(first_date)
+      ) {
+        if (
+          c_date &&
+          (
+            !drop ||
+            new Date(drop) > new Date(c_date)
+          )
+        ) {
           if (deltas[c_date]) {
             deltas[c_date].cp += s.get('PlanEstimate');
             deltas[c_date].cs += 1;
-          } else {
-            deltas[Object.keys(deltas)[0]].cp += s.get('PlanEstimate');
-            deltas[Object.keys(deltas)[0]].cs += 1;
+          } else if (new Date(c_date) < new Date(first_date)) {
+            deltas[first_date].cp += s.get('PlanEstimate');
+            deltas[first_date].cs += 1;
+          }
+
+          if (drop && deltas[drop] && new Date(drop) >= new Date(c_date)) {
+            deltas[drop].cp -= s.get('PlanEstimate');
+            deltas[drop].cs -= 1;
           }
         }
 
-        if (drop && deltas[drop]) {
-          deltas[drop].cp -= s.get('PlanEstimate');
-          deltas[drop].cs -= 1;
+        if (
+          r_date &&
+          (
+            !drop ||
+            new Date(drop) > new Date(r_date)
+          )
+        ) {
+          if (deltas[r_date]) {
+            deltas[r_date].rp += s.get('PlanEstimate');
+            deltas[r_date].rs += 1;
+          } else if (new Date(r_date) < new Date(first_date)) {
+            deltas[first_date].rp += s.get('PlanEstimate');
+            deltas[first_date].rs += 1;
+          }
+
+          if (drop && deltas[drop] && new Date(drop) >= new Date(r_date)) {
+            deltas[drop].rp -= s.get('PlanEstimate');
+            deltas[drop].rs -= 1;
+          }
         }
       }
     });
