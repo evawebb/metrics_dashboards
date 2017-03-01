@@ -1,4 +1,4 @@
-Ext.define('ZzacksFeatureProgressDashboardApp', {
+Ext.define('ZzacksTeamProgressDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
   
@@ -25,9 +25,20 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
   },
 
   onTimeboxScopeChange: function(ts) {
+    var that = this;
+    this.start(function() {
+      that.first_run = true;
+      that.ts = ts;
+      that.fetch_iterations(ts, []);
+    });
   },
 
   refresh: function() {
+    var that = this;
+    this.start(function() {
+      that.first_run = true;
+      that.fetch_iterations(that.ts, []);
+    });
   },
 
   start: function(call_thru) {
@@ -98,11 +109,6 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
           {
             property: 'Iteration.Name',
             value: it.get('Name')
-          },
-          {
-            property: 'Feature',
-            operator: '!=',
-            value: undefined
           }
         ]
       }, this);
@@ -130,9 +136,10 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
   create_options: function(iterations, stories, excluded_its) {
     var that = this;
 
+    var lt = that.first_run ? 'Show iteration selector' : 'Hide iteration selector';
     that.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature_progress()">Refresh this dashboard</a><br /><a id="iteration_toggle_link" href="javascript:void(0);" onclick="toggle_iteration_settings()">Show iteration selector</a>'
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team_progress()">Refresh this dashboard</a><br /><a id="iteration_toggle_link" href="javascript:void(0);" onclick="toggle_iteration_settings()">' + lt + '</a>'
     });
 
     var checkboxes = [];
@@ -170,8 +177,11 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
     this._mask.show();
     var that = this;
 
-    var total_planned = 0;
-    var accepted = {};
+    var data = {
+      total: 0,
+      total_planned: 0,
+      accepted: {}
+    };
 
     for (var i = 0; i < iterations.length; i += 1) {
       if (i < iterations.length - 1) {
@@ -186,7 +196,7 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
     });
 
     iterations.forEach(function(it) {
-      accepted[it.get('Name')] = {
+      data.accepted[it.get('Name')] = {
         amt: 0,
         start: it.get('StartDate'),
         end: it.get('EndDate')
@@ -194,47 +204,52 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
     });
 
     stories.forEach(function(s) {
-      total_planned += s.get('PlanEstimate');
+      data.total += s.get('PlanEstimate');
+      if (s.get('Feature')) {
+        data.total_planned += s.get('PlanEstimate');
 
-      if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
-        var a_date = s.get('AcceptedDate');
-        Object.keys(accepted).forEach(function(it) {
-          var r = accepted[it];
-          if (r.start <= a_date && a_date < r.end) {
-            r.amt += s.get('PlanEstimate');
-          }
-        });
+        if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
+          var a_date = s.get('AcceptedDate');
+          Object.keys(data.accepted).forEach(function(it) {
+            var r = data.accepted[it];
+            if (r.start <= a_date && a_date < r.end) {
+              r.amt += s.get('PlanEstimate');
+            }
+          });
+        }
       }
     });
 
-    that.build_table(total_planned, accepted);
+    that.build_table(data);
+    // that.build_feature_graph(data);
   },
 
-  build_table: function(total_planned, accepted) {
+  build_table: function(data) {
     this._mask.msg = 'Building table...';
     this._mask.show();
     var that = this;
 
-    var table = '<table class="center"><thead><tr>' +
+    var table = '<div class="center title">Feature Work Progress Table</div>' +
+      '<table class="center"><thead><tr>' +
       '<th class="bold tablecell">Iteration</th>' +
-      '<th class="bold tablecell">Percent Done</th>' +
+      '<th class="bold tablecell">Percent Feature Work Done</th>' +
       '<th class="bold tablecell">Percent Time</th>' +
-      '<th class="bold tablecell">Cumulative Percent Done</th>' +
+      '<th class="bold tablecell">Cumulative Percent Feature Work Done</th>' +
       '<th class="bold tablecell">Cumulative Percent Time</th>' +
       '</tr></thead>';
 
     var pts = 0;
     var its = 0;
-    Object.keys(accepted).forEach(function(it) {
-      pts += accepted[it].amt;
+    Object.keys(data.accepted).forEach(function(it) {
+      pts += data.accepted[it].amt;
       its += 1;
 
       table += '<tr>';
       table += '<td class="tablecell">' + it + '</td>';
-      table += '<td class="tablecell">' + (accepted[it].amt / total_planned * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (1 / Object.keys(accepted).length * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (pts / total_planned * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (its / Object.keys(accepted).length * 100).toFixed(2) + '%</td>';
+      table += '<td class="tablecell">' + (data.accepted[it].amt / data.total_planned * 100).toFixed(2) + '%</td>';
+      table += '<td class="tablecell">' + (1 / Object.keys(data.accepted).length * 100).toFixed(2) + '%</td>';
+      table += '<td class="tablecell">' + (pts / data.total_planned * 100).toFixed(2) + '%</td>';
+      table += '<td class="tablecell">' + (its / Object.keys(data.accepted).length * 100).toFixed(2) + '%</td>';
       table += '</tr>';
     });
 
@@ -248,6 +263,10 @@ Ext.define('ZzacksFeatureProgressDashboardApp', {
     this._mask.hide();
     this.locked = false;
   },
+
+  // build_feature_graph: function(data) {
+
+  // },
 
   select_iterations: function(object, new_value, old_value, excluded_its) {
     if (!new_value) {
