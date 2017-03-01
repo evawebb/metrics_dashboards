@@ -16,6 +16,17 @@
         }
       }
 
+      function toggle_iteration_settings() {
+        var l = document.getElementById("iteration_toggle_link");
+        if (l.innerHTML == "Show iteration selector") {
+          Rally.getApp('ZzacksFeatureProgressDashboardApp').settings_container.show();
+          l.innerHTML = "Hide iteration selector";
+        } else {
+          Rally.getApp('ZzacksFeatureProgressDashboardApp').settings_container.hide();
+          l.innerHTML = "Show iteration selector";
+        }
+      }
+
       function refresh_team() {
         Rally.getApp('ZzacksTeamDashboardApp').refresh();
       }
@@ -29,7 +40,11 @@
       }
 
       function refresh_cumulative_work() {
-        Rally.getApp('ZzacksCumulativeworkDashboardApp').refresh();
+        Rally.getApp('ZzacksCumulativeWorkDashboardApp').refresh();
+      }
+
+      function refresh_feature_progress() {
+        Rally.getApp('ZzacksFeatureProgressDashboardApp').refresh();
       }
 
       function load_menu() {
