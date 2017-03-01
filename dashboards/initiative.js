@@ -184,8 +184,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this._mask.show();
     var that = this;
 
-    that.f_init_list = [];
-    that.remaining_inits = init_list.length;
+    f_init_list = [];
+    remaining_inits = init_list.length;
 
     init_list.forEach(function(init) {
       var store = Ext.create('Rally.data.wsapi.artifact.Store', {
@@ -208,29 +208,21 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         callback: function(records, operation) {
           var t2 = new Date();
           console.log('Initiative filter query took', (t2 - t1), 'ms.');
+    
+          that._mask.msg = 'Filtering initiatives... (' + (remaining_inits - 1) + ' initiatives left)';
+          that._mask.show();
+
           if (operation.wasSuccessful() && records.length > 0) {
-            that.filter_initiatives_endpoint(ts, init.get('FormattedID') + ': ' + init.get('Name'));
-          } else {
-            that.filter_initiatives_endpoint(ts, null);
+            f_init_list.push(init.get('FormattedID') + ': ' + init.get('Name'));
+          }
+
+          remaining_inits -= 1;
+          if (remaining_inits == 0) {
+            that.fetch_committed_features(ts, f_init_list);
           }
         }
       });
     });
-  },
-
-  filter_initiatives_endpoint(ts, element) {
-    this._mask.msg = 'Filtering initiatives... (' + (this.remaining_inits - 1) + ' initiatives left)';
-    this._mask.show();
-    var that = this;
-
-    if (element) {
-      that.f_init_list.push(element);
-    }
-
-    that.remaining_inits -= 1;
-    if (that.remaining_inits == 0) {
-      that.fetch_committed_features(ts, that.f_init_list);
-    }
   },
 
   fetch_committed_features: function(ts, init_list) {
