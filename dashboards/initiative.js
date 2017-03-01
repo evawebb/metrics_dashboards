@@ -688,7 +688,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       plotOptions: { line: {
         lineWidth: 3,
         marker: { enabled: false }
-      }}
+      } }
     };
     var tooltip_header = '<span style="font-size: 10px">{series.name}</span><br/>';
     var tooltip_point = '<b>{point.y} {unit}</b><br />on {point.date}';

@@ -55,17 +55,16 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     this._mask.show();
     var that = this;
 
-    start_date = ts.record.raw.ReleaseStartDate;
+    that.start_date = ts.record.raw.ReleaseStartDate;
     that.end_date = ts.record.raw.ReleaseDate;
 
     var store = Ext.create('Rally.data.wsapi.Store', {
       model: 'Iteration',
-      fetch: ['Name', 'StartDate'],
       filters: [
         {
           property: 'StartDate',
           operator: '>=',
-          value: start_date
+          value: that.start_date
         },
         {
           property: 'StartDate',
@@ -180,7 +179,9 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     var data = {
       total: 0,
       total_planned: 0,
-      accepted: {}
+      accepted: {},
+      capacities: [],
+      progress: {}
     };
 
     for (var i = 0; i < iterations.length; i += 1) {
@@ -191,25 +192,39 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       }
     }
 
-    iterations = iterations.filter(function(it) {
+    var filtered_its = iterations.filter(function(it) {
       return !excluded_its.includes(it.get('Name'));
     });
 
     iterations.forEach(function(it) {
-      data.accepted[it.get('Name')] = {
-        amt: 0,
-        start: it.get('StartDate'),
-        end: it.get('EndDate')
-      };
+      if (filtered_its.includes(it)) {
+        data.accepted[it.get('Name')] = {
+          amt: 0,
+          start: it.get('StartDate'),
+          end: it.get('EndDate')
+        };
+      }
+
+      data.capacities.push({
+        c: it.get('PlannedVelocity'),
+        d: it.get('StartDate').toDateString()
+      });
     });
 
+    for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
+      data.progress[d.toDateString()] = 0;
+    }
+
+    var first_date = new Date(that.start_date).toDateString();
     stories.forEach(function(s) {
       data.total += s.get('PlanEstimate');
-      if (s.get('Feature')) {
-        data.total_planned += s.get('PlanEstimate');
 
-        if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
-          var a_date = s.get('AcceptedDate');
+      if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
+        var a_date = s.get('AcceptedDate');
+
+        if (s.get('Feature')) {
+          data.total_planned += s.get('PlanEstimate');
+
           Object.keys(data.accepted).forEach(function(it) {
             var r = data.accepted[it];
             if (r.start <= a_date && a_date < r.end) {
@@ -217,16 +232,37 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
             }
           });
         }
+
+        a_date = a_date.toDateString();
+        if (data.progress.hasOwnProperty(a_date)) {
+          data.progress[a_date] += s.get('PlanEstimate');
+        } else if (new Date(a_date) < new Date(first_date)) {
+          data.progress[first_date] += s.get('PlanEstimate');
+        }
       }
     });
 
+    var d = new Date(that.start_date);
+    while (true) {
+      var prev_d = d.toDateString();
+      d.setDate(d.getDate() + 1);
+
+      if (data.progress.hasOwnProperty(d.toDateString())) {
+        data.progress[d.toDateString()] += data.progress[prev_d];
+      } else {
+        break;
+      }
+    }
+
     that.build_table(data);
-    // that.build_feature_graph(data);
+    that.add({ xtype: 'component', html: '<hr />' });
+    that.build_feature_graph(data);
+
+    this._mask.hide();
+    this.locked = false;
   },
 
   build_table: function(data) {
-    this._mask.msg = 'Building table...';
-    this._mask.show();
     var that = this;
 
     var table = '<div class="center title">Feature Work Progress Table</div>' +
@@ -259,14 +295,79 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       xtype: 'component',
       html: table
     });
-
-    this._mask.hide();
-    this.locked = false;
   },
 
-  // build_feature_graph: function(data) {
+  build_feature_graph: function(data) {
+    var that = this;
 
-  // },
+    var accepted = [];
+    var categories = [];
+    var capacity = [];
+    var today_index = -1;
+    var curr_capacity = 0;
+    var iteration_index = 0;
+    for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
+      var dtds = d.toDateString();
+      categories.push(dtds);
+
+      if (today_index < 0) {
+        accepted.push(data.progress[dtds]);
+      }
+
+      if (
+        iteration_index < data.capacities.length &&
+        data.capacities[iteration_index].d == dtds
+      ) {
+        curr_capacity += data.capacities[iteration_index].c;
+        iteration_index += 1;
+      }
+      capacity.push(curr_capacity);
+
+      if (dtds == new Date().toDateString()) {
+        today_index = categories.length - 1;
+      }
+    }
+
+    var series = [
+      {
+        name: 'Capacity',
+        data: capacity
+      },
+      {
+        name: 'Accepted',
+        data: accepted
+      }
+    ];
+
+    var feature_chart = this.add({
+      xtype: 'rallychart',
+      loadMask: false,
+      chartData: { series: series, categories: categories },
+      chartConfig: {
+        chart: { type: 'area' },
+        title: { text: 'Work Accepted vs. Capacity' },
+        subtitle: { text: 'This includes all work completed, not just planned feature work' },
+        xAxis: { 
+          title: { enabled: false },
+          tickInterval: 7,
+          labels: { rotation: -20 },
+          plotLines: [{
+            color: 'black',
+            value: today_index,
+            width: 2,
+            label: { text: 'Today' }
+          }]
+        },
+        yAxis: { 
+          title: { text: 'Total points' },
+          min: 0
+        },
+        plotOptions: { area: {
+          marker: { enabled: false }
+        } }
+      }
+    });
+  },
 
   select_iterations: function(object, new_value, old_value, excluded_its) {
     if (!new_value) {
