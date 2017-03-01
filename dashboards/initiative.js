@@ -310,65 +310,68 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   fetch_unschedule_dates(features, unsched_features, initiative, ts, init_list) {
-    this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_features.length + ' features left)';
+    this._mask.msg = 'Calculating unscheduled feature dates...';
     this._mask.show();
     var that = this;
 
-    var store = Ext.create('Rally.data.wsapi.Store', {
-      model: 'Revision',
-      fetch: ['Description', 'CreationDate'],
-      filters: [
-        {
-          property: 'RevisionHistory.ObjectID',
-          value: unsched_features[0].get('RevisionHistory')
-            ._ref.split('/').reverse()[0]
-        }
-      ],
-      sorters: [
-        {
-          property: 'RevisionNumber',
-          direction: 'ASC'
-        }
-      ],
-      limit: 1000
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        var relevant = false;
-        if (operation.wasSuccessful()) {
-          var r_filt = records.filter(function(r) {
-            return r.get('Description').match(new RegExp(
-              'RELEASE (removed|changed from) \\['
-              + ts.record.raw.Name
-              + '\\]'
-            ));
-          });
-          
-          if (r_filt.length > 0) {
-            relevant = true;
-            r_filt.forEach(function(r) {
-              that.drops[unsched_features[0].get('ObjectID')] = 
-                r.get('CreationDate').toDateString();
+    var remaining_features = unsched_features.length;
+
+    unsched_features.forEach(function(uf) {
+      var store = Ext.create('Rally.data.wsapi.Store', {
+        model: 'Revision',
+        fetch: ['Description', 'CreationDate'],
+        filters: [
+          {
+            property: 'RevisionHistory.ObjectID',
+            value: uf.get('RevisionHistory')._ref.split(',').reverse()[0]
+          }
+        ],
+        sorters: [
+          {
+            property: 'RevisionNumber',
+            direction: 'ASC'
+          }
+        ],
+        limit: 1000
+      }, this);
+      var t1 = new Date();
+      store.load({
+        scope: this,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          that._mask.msg = 'Calculating unscheduled feature dates... (' + (remaining_features - 1) + ' features left)';
+          that._mask.show();
+
+          var relevant = false;
+          if (operation.wasSuccessful()) {
+            var r_filt = records.filter(function(r) {
+              return r.get('Description').match(new RegExp(
+                'RELEASE (removed|changed from) \\[' +
+                ts.record.raw.Name +
+                '\\]'
+              ));
             });
+
+            if (r_filt.length > 0) {
+              relevant = true;
+              r_filt.forEach(function(r) {
+                that.drops[uf.get('ObjectID')] = r.get('CreationDate').toDateString();
+              });
+            }
+          }
+
+          if (relevant) {
+            features.push(uf);
+          }
+
+          remaining_features -= 1;
+          if (remaining_features == 0) {
+            that.fetch_stories(features, [], initiative, ts, init_list);
           }
         }
-
-        if (relevant) {
-          features.push(unsched_features.shift());
-        } else {
-          unsched_features.shift();
-        }
-
-        if (unsched_features.length > 0) {
-          this.fetch_unschedule_dates(features, unsched_features, initiative, ts, init_list);
-        } else {
-          this.fetch_stories(features, [], initiative, ts, init_list);
-        }
-      }
+      });
     });
   },
 
