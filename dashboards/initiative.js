@@ -295,7 +295,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         if (records && records.length > 0) {
           this.fetch_unschedule_dates(features, records, initiative, ts, init_list);
         } else {
-          this.fetch_stories(features, [], initiative, ts, init_list);
+          this.fetch_stories(features, initiative, ts, init_list);
         }
       }
     });
@@ -360,49 +360,56 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
           remaining_features -= 1;
           if (remaining_features == 0) {
-            that.fetch_stories(features, [], initiative, ts, init_list);
+            that.fetch_stories(features, initiative, ts, init_list);
           }
         }
       });
     });
   },
 
-  fetch_stories: function(features, stories, initiative, ts, init_list) {
-    this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
+  fetch_stories: function(features, initiative, ts, init_list) {
+    this._mask.msg = 'Fetching stories...';
     this._mask.show();
-
     var that = this;
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['UserStory', 'Defect'],
-      fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature', 'CreationDate'],
-      filters: [
-        {
-          property: 'Feature.Name',
-          value: features[0].get('Name')
-        },
-        {
-          property: 'DirectChildrenCount',
-          value: 0
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        if (operation.wasSuccessful()) {
-          stories = stories.concat(records);
-        }
-        features.shift();
 
-        if (features.length > 0) {
-          this.fetch_stories(features, stories, initiative, ts, init_list);
-        } else {
-          this.fetch_histories(stories, 0, {}, initiative, ts, init_list);
+    var stories = [];
+    var remaining_features = features.length;
+
+    features.forEach(function(f) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['UserStory', 'Defect'],
+        fetch: ['ObjectID', 'Name', 'PlanEstimate', 'FormattedID', 'Feature', 'CreationDate'],
+        filters: [
+          {
+            property: 'Feature.Name',
+            value: f.get('Name')
+          },
+          {
+            property: 'DirectChildrenCount',
+            value: 0
+          }
+        ]
+      }, this);
+      var t1 = new Date();
+      store.load({
+        scope: this,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          that._mask.msg = 'Fetching stories... (' + (remaining_features - 1) + ' features left)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            stories = stories.concat(records);
+          }
+
+          remaining_features -= 1;
+          if (remaining_features == 0) {
+            that.fetch_histories(stories, 0, {}, initiative, ts, init_list);
+          }
         }
-      }
+      });
     });
   },
 
