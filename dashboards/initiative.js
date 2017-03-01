@@ -174,49 +174,63 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           init_list = records;
         }
 
-        that.filter_initiatives(ts, init_list, []);
+        that.filter_initiatives(ts, init_list);
       }
     });
   },
 
-  filter_initiatives: function(ts, u_init_list, init_list) {
-    this._mask.msg = 'Filtering initiatives... (' + u_init_list.length + ' initiatives left)';
+  filter_initiatives(ts, init_list) {
+    this._mask.msg = 'Filtering initiatives...';
     this._mask.show();
     var that = this;
 
-    var init = u_init_list.shift();
+    that.f_init_list = [];
+    that.remaining_inits = init_list.length;
 
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'Release'],
-      filters: [
-        {
-          property: 'Release.Name',
-          value: ts.record.raw.Name
-        },
-        {
-          property: 'Parent.FormattedID',
-          value: init.get('FormattedID')
+    init_list.forEach(function(init) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['PortfolioItem/Feature'],
+        fetch: ['Name', 'Release'],
+        filters: [
+          {
+            property: 'Release.Name',
+            value: ts.record.raw.Name
+          },
+          {
+            property: 'Parent.FormattedID',
+            value: init.get('FormattedID')
+          }
+        ]
+      }, this);
+      var t1 = new Date();
+      store.load({
+        scope: this,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Initiative filter query took', (t2 - t1), 'ms.');
+          if (operation.wasSuccessful() && records.length > 0) {
+            that.filter_initiatives_endpoint(ts, init.get('FormattedID') + ': ' + init.get('Name'));
+          } else {
+            that.filter_initiatives_endpoint(ts, null);
+          }
         }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Initiative filter query took', (t2 - t1), 'ms.');
-        if (operation.wasSuccessful() && records.length > 0) {
-          init_list.push(init.get('FormattedID') + ': ' + init.get('Name'));
-        }
-
-        if (u_init_list.length > 0) {
-          this.filter_initiatives(ts, u_init_list, init_list);
-        } else {
-          this.fetch_committed_features(ts, init_list);
-        }
-      }
+      });
     });
+  },
+
+  filter_initiatives_endpoint(ts, element) {
+    this._mask.msg = 'Filtering initiatives... (' + (this.remaining_inits - 1) + ' initiatives left)';
+    this._mask.show();
+    var that = this;
+
+    if (element) {
+      that.f_init_list.push(element);
+    }
+
+    that.remaining_inits -= 1;
+    if (that.remaining_inits == 0) {
+      that.fetch_committed_features(ts, that.f_init_list);
+    }
   },
 
   fetch_committed_features: function(ts, init_list) {
