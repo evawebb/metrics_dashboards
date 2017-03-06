@@ -61,14 +61,14 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
         start_date: that.ts.record.raw.ReleaseStartDate,
         end_date: that.ts.record.raw.ReleaseDate
       };
-      that.fetch_artifacts([], that.release, 'UserStory', 'Artifact type');
+      that.fetch_artifacts([], that.release);
     });
   },
 
   refresh: function() {
     var that = this;
     this.start(function() {
-      that.fetch_artifacts([], that.release, 'UserStory', 'Artifact type');
+      that.fetch_artifacts([], that.release);
     });
   },
 
@@ -95,13 +95,13 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
     this.locked = false;
   },
 
-  fetch_artifacts: function(artifacts, release, type) {
+  fetch_artifacts: function(artifacts, release) {
     this._mask.msg = 'Fetching artifacts...';
     this._mask.show();
     var that = this;
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: [type],
+      models: ['UserStory', 'Defect'],
       fetch: ['PlanEstimate', '_type', 'Tags', 'AcceptedDate', 'Feature'],
       filters: [
         {
@@ -126,11 +126,7 @@ Ext.define('ZzacksCumulativeWorkDashboardApp', {
 
         if (operation.wasSuccessful()) {
           artifacts = artifacts.concat(records);
-          if (type == 'UserStory') {
-            that.fetch_artifacts(artifacts, release, 'Defect');
-          } else {
-            that.fetch_features(artifacts, release);
-          }
+          that.fetch_features(artifacts, release);
         } else {
           that.haltEarly('No artifacts found for this release.');
         }
