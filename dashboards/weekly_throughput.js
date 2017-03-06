@@ -25,7 +25,7 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
   start: function() {
     this.project_oid = this.getContext().getProject().ObjectID;
     var start_date = this.calculate_first_date();
-    this.fetch_stories({}, start_date, 52);
+    this.fetch_stories(start_date);
   },
 
   calculate_first_date: function() {
@@ -40,62 +40,75 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
     return the_date;
   },
 
-  fetch_stories: function(counts, start_date, count) {
-    this._mask.msg = 'Fetching stories... (' + count + ' weeks left)';
+  fetch_stories: function(start_date) {
+    this._mask.msg = 'Fetching stories...';
     this._mask.show();
+    var that = this;
 
+    var counts = {};
+    var date_ranges = [];
     var end_date = new Date(start_date);
     end_date.setDate(end_date.getDate() + 7);
+    while (end_date < new Date()) {
+      counts[start_date.toDateString()] = {};
+      date_ranges.push({
+        start: new Date(start_date),
+        end: new Date(end_date)
+      });
+      start_date.setDate(start_date.getDate() + 7);
+      end_date.setDate(end_date.getDate() + 7);
+    }
+    var weeks_remaining = date_ranges.length;
 
-    var that = this;
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['UserStory', 'Defect'],
-      filters: [
-        {
-          property: 'AcceptedDate',
-          operator: '>=',
-          value: start_date
-        },
-        {
-          property: 'AcceptedDate',
-          operator: '<',
-          value: end_date
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+    date_ranges.forEach(function(dr) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['UserStory', 'Defect'],
+        filters: [
+          {
+            property: 'AcceptedDate',
+            operator: '>=',
+            value: dr.start
+          },
+          {
+            property: 'AcceptedDate',
+            operator: '<',
+            value: dr.end
+          }
+        ]
+      }, this);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-        if (operation.wasSuccessful()) {
-          var d = start_date.toDateString();
-          counts[d] = {
-            total_story_pts: 0,
-            total_stories: 0,
-            total_defect_pts: 0,
-            total_defects: 0
-          };
-          records.forEach(function(r) {
-            if (r.get('_type') == 'hierarchicalrequirement') {
-              counts[d].total_story_pts += r.get('PlanEstimate');
-              counts[d].total_stories += 1;
-            } else if (r.get('_type') == 'defect') {
-              counts[d].total_defect_pts += r.get('PlanEstimate');
-              counts[d].total_defects += 1;
-            }
-          });
-        }
+          if (operation.wasSuccessful()) {
+            var d = dr.start.toDateString();
+            counts[d] = {
+              total_story_pts: 0,
+              total_stories: 0,
+              total_defect_pts: 0,
+              total_defects: 0
+            };
+            records.forEach(function(r) {
+              if (r.get('_type') == 'hierarchicalrequirement') {
+                counts[d].total_story_pts += r.get('PlanEstimate');
+                counts[d].total_stories += 1;
+              } else if (r.get('_type') == 'defect') {
+                counts[d].total_defect_pts += r.get('PlanEstimate');
+                counts[d].total_defects += 1;
+              }
+            });
+          }
 
-        if (end_date < new Date()) {
-          that.fetch_stories(counts, end_date, count - 1);
-        } else {
-          that.removeAll();
-          that.create_options(counts);
+          weeks_remaining -= 1;
+          if (weeks_remaining == 0) {
+            that.removeAll();
+            that.create_options(counts);
+          }
         }
-      }
+      });
     });
   },
 
