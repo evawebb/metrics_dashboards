@@ -215,43 +215,46 @@ Ext.define('ZzacksTeamDashboardApp', {
     });
   },
 
-  // Recursively fetch stories for each iteration filter and add them
-  // all together.
-  fetch_stories: function(iterations, stories) {
+  fetch_stories: function(iterations) {
     this._mask.msg = 'Fetching stories...';
     this._mask.show();
+    var that = this;
 
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['UserStory', 'Defect'],
-      fetch: this.data_keys,
-      filters: [
-        {
-          property: 'Iteration.Name',
-          value: iterations[0]
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        if (operation.wasSuccessful()) {
-          stories = stories.concat(records);
-        }
-        iterations.shift();
+    var remaining_iterations = iterations.length;
+    var stories = [];
 
-        if (iterations.length > 0) {
-          this.fetch_stories(iterations, stories);
-        } else {
-          if (stories.length > 0) {
-            this.fetch_kanban_states(stories);
-          } else {
-            this.haltEarly('No stories found.');
+    iterations.forEach(function(it) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['UserStory', 'Defect'],
+        fetch: that.data_keys,
+        filters: [
+          {
+            property: 'Iteration.Name',
+            value: it
+          }
+        ]
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          if (operation.wasSuccessful()) {
+            stories = stories.concat(records);
+          }
+
+          remaining_iterations -= 1;
+          if (remaining_iterations == 0) {
+            if (stories.length > 0) {
+              that.fetch_kanban_states(stories);
+            } else {
+              that.haltEarly('No stories found.');
+            }
           }
         }
-      }
+      });
     });
   },
 
