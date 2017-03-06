@@ -113,19 +113,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     }
   },
 
-  check_initiative: function(init_list) {
-    if (init_list.length > 0) {
-      var existing_initiative = this.Initiative + ': ' + this.InitiativeName;
-      if (!init_list.includes(existing_initiative)) {
-        var sp = init_list[0].split(':');
-        this.Initiative = sp[0];
-        this.InitiativeName = sp[1].slice(1)
-      }
-    } else {
-      this.haltEarly("No initiatives found.");
-    }
-  },
-
   check_cached_data: function(ts) {
     var that = this;
     var release = ts.record.raw.Name;
@@ -156,30 +143,34 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   fetch_initiatives: function(ts) {
     var that = this;
 
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Initiative'],
-      fetch: ['Name', 'FormattedID'],
-      limit: 1000
-      // This is a quicker way to filter initiatives out of the dropdown.
-      // filters: [
-      //   {
-      //     property: 'LastUpdateDate',
-      //     operator: '>',
-      //     value: ts.record.raw.ReleaseStartDate
-      //   }
-      // ]
-    }, this);
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var init_list = [];
-        if (operation.wasSuccessful()) {
-          init_list = records;
-        }
+    if (that.stored_init_list_timebox != ts.record.raw.Name) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['PortfolioItem/Initiative'],
+        fetch: ['Name', 'FormattedID'],
+        limit: 1000
+        // This is a quicker way to filter initiatives out of the dropdown.
+        // filters: [
+        //   {
+        //     property: 'LastUpdateDate',
+        //     operator: '>',
+        //     value: ts.record.raw.ReleaseStartDate
+        //   }
+        // ]
+      }, this);
+      store.load({
+        scope: this,
+        callback: function(records, operation) {
+          var init_list = [];
+          if (operation.wasSuccessful()) {
+            init_list = records;
+          }
 
-        that.filter_initiatives(ts, init_list);
-      }
-    });
+          that.filter_initiatives(ts, init_list);
+        }
+      });
+    } else {
+      that.check_for_initiative(ts, that.stored_init_list);
+    }
   },
 
   filter_initiatives(ts, init_list) {
@@ -221,17 +212,26 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
           remaining_inits -= 1;
           if (remaining_inits == 0) {
-            f_init_list.sort();
-            f_init_list.unshift('No initiative');
-            if (!that.Initiative) {
-              that.end_without_graph(f_init_list);
-            } else {
-              that.fetch_committed_features(ts, f_init_list);
-            }
+            that.stored_init_list = f_init_list;
+            that.stored_init_list_timebox = ts.record.raw.Name;
+            that.check_for_initiative(ts, f_init_list);
           }
         }
       });
     });
+  },
+
+  check_for_initiative: function(ts, init_list) {
+    init_list.sort();
+    init_list.unshift('No initiative');
+
+    var current_initiative = this.Initiative + ': ' + this.InitiativeName;
+
+    if (!this.Initiative || !init_list.includes(current_initiative)) {
+      this.end_without_graph(init_list);
+    } else {
+      this.fetch_committed_features(ts, init_list);
+    }
   },
 
   fetch_committed_features: function(ts, init_list) {
@@ -239,8 +239,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
     this._mask.show();
 
     var that = this;
-
-    this.check_initiative(init_list);
     var initiative = this.Initiative;
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
