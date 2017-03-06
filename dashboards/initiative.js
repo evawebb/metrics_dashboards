@@ -75,6 +75,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   clean_cached_data: function(ts) {
+    this._mask.msg = 'Checking cached data...';
+    this._mask.show();
     var that = this;
 
     Rally.data.PreferenceManager.load({
@@ -138,8 +140,9 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
-            that.check_initiative(cd.init_list);
-            that.create_options(cd.deltas, cd.initiative, cd.init_list);
+            cd.init_list.sort();
+            cd.init_list.unshift('No initiative');
+            that.create_options_pipeline(cd.deltas, cd.initiative, cd.init_list);
           } else {
             that.fetch_initiatives(ts);
           }
@@ -218,7 +221,13 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
           remaining_inits -= 1;
           if (remaining_inits == 0) {
-            that.fetch_committed_features(ts, f_init_list);
+            f_init_list.sort();
+            f_init_list.unshift('No initiative');
+            if (!that.Initiative) {
+              that.end_without_graph(f_init_list);
+            } else {
+              that.fetch_committed_features(ts, f_init_list);
+            }
           }
         }
       });
@@ -589,12 +598,18 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         if (response[0].errorMessages) {
           console.log('Error saving preferences:', response[0].errorMessages);
         }
-        that.create_options(deltas, initiative, init_list);
+        that.create_options_pipeline(deltas, initiative, init_list);
       }
     });
   },
 
-  create_options: function(deltas, initiative, init_list) {
+  end_without_graph: function(init_list) {
+    this.create_options(init_list)
+    this._mask.hide();
+    this.locked = false;
+  },
+
+  create_options: function(init_list) {
     var that = this;
     this.removeAll();
 
@@ -620,6 +635,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
         fn: that.change_graph_type.bind(that)
       }}
     });
+  },
+
+  create_options_pipeline: function(deltas, initiative, init_list) {
+    this.create_options(init_list);
 
     this.deltas = deltas;
     this.initiative = initiative;
@@ -728,13 +747,22 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
   change_initiative: function(t, new_item, old_item, e) {
     if (this.change_init && old_item) {
-      var that = this;
-      this.start(function() {
-        var sp = new_item.split(':');
-        that.Initiative = sp[0];
-        that.InitiativeName = sp[1].slice(1)
-        that.clean_cached_data(that.ts);
-      });
+      if (new_item != 'No initiative') {
+        var that = this;
+        this.start(function() {
+          var sp = new_item.split(':');
+          that.Initiative = sp[0];
+          that.InitiativeName = sp[1].slice(1)
+          that.clean_cached_data(that.ts);
+        });
+      } else {
+        var that = this;
+        this.start(function() {
+          delete that.Initiative;
+          delete that.InitiativeName;
+          that.clean_cached_data(that.ts);
+        });
+      }
     }
   },
 
