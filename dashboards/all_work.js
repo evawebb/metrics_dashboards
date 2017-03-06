@@ -175,7 +175,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
           that.fetch_artifacts({
             u: {},
             d: {}
-          }, 3, 'UserStory');
+          });
         } else {
           console.log(':(');
         }
@@ -183,53 +183,57 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
   },
 
-  fetch_artifacts: function(artifacts, release_index, type) {
+  fetch_artifacts: function(artifacts) {
     this._mask.msg = 'Fetching artifacts...';
     this._mask.show();
-
     var that = this;
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', { 
-      models: [type],
-      filters: [
-        {
-          property: 'AcceptedDate',
-          operator: '>=',
-          value: that.releases[release_index].start_date
-        },
-        {
-          property: 'AcceptedDate',
-          operator: '<',
-          value: that.releases[release_index].end_date
-        },
-        {
-          property: 'DirectChildrenCount',
-          value: 0
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      limit: 1500,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-        if (operation.wasSuccessful()) {
-          var key = (type == 'UserStory') ? 'u' : 'd';
-          artifacts[key][that.releases[release_index].name] = records;
-        }
+    var remaining_releases = that.releases.length * 2;
 
-        if (release_index > 0) {
-          that.fetch_artifacts(artifacts, release_index - 1, type);
-        } else {
-          if (type == 'UserStory') {
-            that.fetch_artifacts(artifacts, that.releases.length - 1, 'Defect');
-          } else {
-            that.calculate_deltas(artifacts);
+    ['UserStory', 'Defect'].forEach(function(t) {
+      that.releases.forEach(function(r) {
+        var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+          models: [t],
+          filters: [
+            {
+              property: 'AcceptedDate',
+              operator: '>=',
+              value: r.start_date
+            },
+            {
+              property: 'AcceptedDate',
+              operator: '<',
+              value: r.end_date
+            },
+            {
+              property: 'DirectChildrenCount',
+              value: 0
+            }
+          ]
+        }, this);
+        var t1 = new Date();
+        store.load({
+          scope: this,
+          limit: 1500,
+          callback: function(records, operation) {
+            var t2 = new Date();
+            console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+            that._mask.msg = 'Fetching artifacts... (' + (remaining_releases - 1) + ' releases left)';
+            that._mask.show();
+
+            if (operation.wasSuccessful()) {
+              var key = (t == 'UserStory') ? 'u' : 'd';
+              artifacts[key][r.name] = records;
+            }
+
+            remaining_releases -= 1;
+            if (remaining_releases == 0) {
+              that.calculate_deltas(artifacts);
+            }
           }
-        }
-      }
+        });
+      });
     });
   },
 
