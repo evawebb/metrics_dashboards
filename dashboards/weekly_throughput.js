@@ -41,8 +41,6 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
   },
 
   fetch_stories: function(start_date) {
-    this._mask.msg = 'Fetching stories...';
-    this._mask.show();
     var that = this;
 
     var counts = {};
@@ -59,6 +57,9 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
       end_date.setDate(end_date.getDate() + 7);
     }
     var weeks_remaining = date_ranges.length;
+
+    this._mask.msg = 'Fetching stories... (' + weeks_remaining + ' weeks remaining)';
+    this._mask.show();
 
     date_ranges.forEach(function(dr) {
       var store = Ext.create('Rally.data.wsapi.artifact.Store', {
@@ -83,6 +84,10 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
           var t2 = new Date();
           console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
+          weeks_remaining -= 1;
+          that._mask.msg = 'Fetching stories... (' + weeks_remaining + ' weeks remaining)';
+          that._mask.show();
+
           if (operation.wasSuccessful()) {
             var d = dr.start.toDateString();
             counts[d] = {
@@ -102,7 +107,6 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
             });
           }
 
-          weeks_remaining -= 1;
           if (weeks_remaining == 0) {
             that.removeAll();
             that.create_options(counts);

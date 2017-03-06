@@ -102,12 +102,12 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
   },
 
   fetch_stories: function(iterations, excluded_its) {
-    this._mask.msg = 'Fetching stories...';
+    var remaining_iterations = iterations.length;
+    this._mask.msg = 'Fetching stories... (' + remaining_iterations + ' iterations remaining)';
     this._mask.show();
     var that = this;
 
     var stories = [];
-    var remaining_iterations = iterations.length;
 
     iterations.forEach(function(it) {
       var store = Ext.create('Rally.data.wsapi.artifact.Store', {

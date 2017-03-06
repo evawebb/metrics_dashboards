@@ -216,11 +216,11 @@ Ext.define('ZzacksTeamDashboardApp', {
   },
 
   fetch_stories: function(iterations) {
-    this._mask.msg = 'Fetching stories...';
+    var remaining_iterations = iterations.length;
+    this._mask.msg = 'Fetching stories... (' + remaining_iterations + ' iterations remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_iterations = iterations.length;
     var stories = [];
 
     iterations.forEach(function(it) {
@@ -241,11 +241,14 @@ Ext.define('ZzacksTeamDashboardApp', {
           var t2 = new Date();
           console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
+          remaining_iterations -= 1;
+          that._mask.msg = 'Fetching stories... (' + remaining_iterations + ' iterations remaining)';
+          that._mask.show();
+
           if (operation.wasSuccessful()) {
             stories = stories.concat(records);
           }
 
-          remaining_iterations -= 1;
           if (remaining_iterations == 0) {
             if (stories.length > 0) {
               that.fetch_kanban_states(stories);

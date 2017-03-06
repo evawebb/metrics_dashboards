@@ -311,11 +311,10 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   fetch_unschedule_dates(features, unsched_features, initiative, ts, init_list) {
-    this._mask.msg = 'Calculating unscheduled feature dates...';
+    var remaining_features = unsched_features.length;
+    this._mask.msg = 'Calculating unscheduled feature dates... (' + remaining_features + ' features remaining)';
     this._mask.show();
     var that = this;
-
-    var remaining_features = unsched_features.length;
 
     unsched_features.forEach(function(uf) {
       var store = Ext.create('Rally.data.wsapi.Store', {
@@ -342,7 +341,8 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           var t2 = new Date();
           console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Calculating unscheduled feature dates... (' + (remaining_features - 1) + ' features left)';
+          remaining_features -= 1;
+          that._mask.msg = 'Calculating unscheduled feature dates... (' + remaining_features + ' features left)';
           that._mask.show();
 
           var relevant = false;
@@ -367,7 +367,6 @@ Ext.define('ZzacksInitiativeDashboardApp', {
             features.push(uf);
           }
 
-          remaining_features -= 1;
           if (remaining_features == 0) {
             that.fetch_stories(features, initiative, ts, init_list);
           }
@@ -377,12 +376,12 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   },
 
   fetch_stories: function(features, initiative, ts, init_list) {
-    this._mask.msg = 'Fetching stories...';
+    var remaining_features = features.length;
+    this._mask.msg = 'Fetching stories... (' + remaining_features + ' features remaining)';
     this._mask.show();
     var that = this;
 
     var stories = [];
-    var remaining_features = features.length;
 
     features.forEach(function(f) {
       var store = Ext.create('Rally.data.wsapi.artifact.Store', {
@@ -406,14 +405,14 @@ Ext.define('ZzacksInitiativeDashboardApp', {
           var t2 = new Date();
           console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Fetching stories... (' + (remaining_features - 1) + ' features left)';
+          remaining_features -= 1;
+          that._mask.msg = 'Fetching stories... (' + remaining_features + ' features left)';
           that._mask.show();
 
           if (operation.wasSuccessful()) {
             stories = stories.concat(records);
           }
 
-          remaining_features -= 1;
           if (remaining_features == 0) {
             that.fetch_histories(stories, 0, {}, initiative, ts, init_list);
           }

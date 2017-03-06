@@ -105,11 +105,11 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   },
 
   fetch_stories(release, features, data) {
-    this._mask.msg = 'Fetching stories...';
+    var remaining_features = features.length;
+    this._mask.msg = 'Fetching stories... (' + remaining_features + ' features remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_features = features.length;
     var feature_clusters = [];
     while (features.length > 0) {
       feature_clusters.push(features.splice(0, 50).map(function(f) {
@@ -141,7 +141,8 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
           var t2 = new Date();
           console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Fetching stories... (' + (remaining_features - c.length) + ' features remaining)';
+          remaining_features -= c.length;
+          that._mask.msg = 'Fetching stories... (' + remaining_features + ' features remaining)';
           that._mask.show();
 
           if (operation.wasSuccessful()) {
@@ -157,7 +158,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
             stories = stories.concat(records);
           }
 
-          remaining_features -= c.length;
           if (remaining_features == 0) {
             that.fetch_historical_estimates(release, stories, data);
           }
@@ -167,11 +167,11 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   },
 
   fetch_historical_estimates: function(release, stories, data) {
-    this._mask.msg = 'Fetching feature estimates...';
+    var remaining_stories = stories.length;
+    this._mask.msg = 'Fetching feature estimates... (' + remaining_stories + ' stories remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_stories = stories.length;
     var story_clusters = [];
     var feature_fid_clusters = [];
     while (stories.length > 0) {
@@ -217,7 +217,8 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
             var t2 = new Date();
             console.log('Feature estimates query took', (t2 - t1), 'ms, and retrieved', lb_data ? lb_data.length : 0, 'results.');
 
-            that._mask.msg = 'Fetching feature estimates... (' + (remaining_stories - story_oids.length) + ' features remaining)';
+            remaining_stories -= story_oids.length;
+            that._mask.msg = 'Fetching feature estimates... (' + remaining_stories + ' features remaining)';
             that._mask.show();
 
             var done = {};
@@ -233,7 +234,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               }
             });
 
-            remaining_stories -= story_oids.length;
             if (remaining_stories == 0) {
               that.build_table(data, that.sort_data(Object.keys(data), data));
             }

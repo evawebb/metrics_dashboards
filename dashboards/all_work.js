@@ -184,11 +184,10 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   },
 
   fetch_artifacts: function(artifacts) {
-    this._mask.msg = 'Fetching artifacts...';
+    var remaining_releases = this.releases.length * 2;
+    this._mask.msg = 'Fetching artifacts... (' + remaining_releases + ' releases remaining)';
     this._mask.show();
     var that = this;
-
-    var remaining_releases = that.releases.length * 2;
 
     ['UserStory', 'Defect'].forEach(function(t) {
       that.releases.forEach(function(r) {
@@ -219,7 +218,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
             var t2 = new Date();
             console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-            that._mask.msg = 'Fetching artifacts... (' + (remaining_releases - 1) + ' releases left)';
+            remaining_releases -= 1;
+            that._mask.msg = 'Fetching artifacts... (' + remaining_releases + ' releases left)';
             that._mask.show();
 
             if (operation.wasSuccessful()) {
@@ -227,7 +227,6 @@ Ext.define('ZzacksAllWorkDashboardApp', {
               artifacts[key][r.name] = records;
             }
 
-            remaining_releases -= 1;
             if (remaining_releases == 0) {
               that.calculate_deltas(artifacts);
             }

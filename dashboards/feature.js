@@ -186,11 +186,11 @@ Ext.define('ZzacksFeatureDashboardApp', {
   },
 
   fetch_committed_features: function(release_names) {
-    this._mask.msg = 'Fetching features...';
+    var remaining_releases = release_names.length;
+    this._mask.msg = 'Fetching features... (' + remaining_releases + ' releases remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_releases = release_names.length;
     var features = [];
     var release_lookups = {};
 
@@ -212,7 +212,8 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var t2 = new Date();
           console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Fetching features... (' + (remaining_releases - 1) + ' releases remaining)';
+          remaining_releases -= 1;
+          that._mask.msg = 'Fetching features... (' + remaining_releases + ' releases remaining)';
           that._mask.show();
 
           if (operation.wasSuccessful()) {
@@ -222,7 +223,6 @@ Ext.define('ZzacksFeatureDashboardApp', {
             features = features.concat(records);
           }
 
-          remaining_releases -= 1;
           if (remaining_releases == 0) {
             that.fetch_unscheduled_features(features, release_lookups);
           }
@@ -232,11 +232,11 @@ Ext.define('ZzacksFeatureDashboardApp', {
   },
 
   fetch_unscheduled_features: function(features, release_lookups) {
-    this._mask.msg = 'Fetching unscheduled features...';
+    var remaining_releases = this.releases.length;
+    this._mask.msg = 'Fetching unscheduled features... (' + remaining_releases + ' releases remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_releases = that.releases.length;
     var unsched_features = [];
 
     that.releases.forEach(function(r) {
@@ -263,14 +263,14 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var t2 = new Date();
           console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Fetching unscheduled features... (' + (remaining_releases - 1) + ' releases remaining)';
+          remaining_releases -= 1;
+          that._mask.msg = 'Fetching unscheduled features... (' + remaining_releases + ' releases remaining)';
           that._mask.show();
 
           if (operation.wasSuccessful()) {
             unsched_features = unsched_features.concat(records);
           }
 
-          remaining_releases -= 1;
           if (remaining_releases == 0) {
             that.fetch_unschedule_dates(features, release_lookups, unsched_features);
           }
@@ -280,11 +280,10 @@ Ext.define('ZzacksFeatureDashboardApp', {
   },
 
   fetch_unschedule_dates(features, release_lookups, unsched_features) {
-    this._mask.msg = 'Calculating unscheduled feature dates...';
+    var remaining_features = unsched_features.length;
+    this._mask.msg = 'Calculating unscheduled feature dates... (' + remaining_features + ' features remaining)';
     this._mask.show();
     var that = this;
-
-    var remaining_features = unsched_features.length;
 
     unsched_features.forEach(function(f) {
       var store = Ext.create('Rally.data.wsapi.Store', {
@@ -310,7 +309,8 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var t2 = new Date();
           console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Calculating unscheduled feature dates... (' + (remaining_features - 1) + ' features remaining)';
+          remaining_features -= 1;
+          that._mask.msg = 'Calculating unscheduled feature dates... (' + remaining_features + ' features remaining)';
           that._mask.show();
 
           var relevant = false;
@@ -334,7 +334,6 @@ Ext.define('ZzacksFeatureDashboardApp', {
             features.push(f);
           }
 
-          remaining_features -= 1;
           if (remaining_features == 0) {
             that.fetch_stories(features, release_lookups);
           }
@@ -344,11 +343,11 @@ Ext.define('ZzacksFeatureDashboardApp', {
   }, 
 
   fetch_stories: function(features, release_lookups) {
-    this._mask.msg = 'Fetching stories...';
+    var remaining_features = features.length;
+    this._mask.msg = 'Fetching stories... (' + remaining_features + ' features remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_features = features.length;
     var feature_clusters = [];
     while (features.length > 0) {
       feature_clusters.push(features.splice(0, 50).map(function(f) {
@@ -380,14 +379,14 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var t2 = new Date();
           console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-          that._mask.msg = 'Fetching stories... (' + (remaining_features - c.length) + ' features remaining)';
+          remaining_features -= c.length;
+          that._mask.msg = 'Fetching stories... (' + remaining_features + ' features remaining)';
           that._mask.show();
 
           if (operation.wasSuccessful()) {
             stories = stories.concat(records);
           }
 
-          remaining_features -= c.length;
           if (remaining_features == 0) {
             that.fetch_histories(stories, release_lookups);
           }
@@ -397,11 +396,11 @@ Ext.define('ZzacksFeatureDashboardApp', {
   },
 
   fetch_histories: function(stories, release_lookups) {
-    this._mask.msg = 'Fetching story histories...';
+    var remaining_stories = stories.length;
+    this._mask.msg = 'Fetching story histories... (' + remaining_stories + ' stories remaining)';
     this._mask.show();
     var that = this;
 
-    var remaining_stories = stories.length;
     var story_clusters = [];
     for (var i = 0; i < stories.length; i += that.histories_cluster_size) {
       story_clusters.push(stories.slice(i, i + that.histories_cluster_size)
@@ -433,7 +432,8 @@ Ext.define('ZzacksFeatureDashboardApp', {
             var t2 = new Date();
             console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
 
-            that._mask.msg = 'Fetching story histories... (' + (remaining_stories - c.length) + ' stories remaining)';
+            remaining_stories -= c.length;
+            that._mask.msg = 'Fetching story histories... (' + remaining_stories + ' stories remaining)';
             that._mask.show();
 
             if (success) {
@@ -453,11 +453,10 @@ Ext.define('ZzacksFeatureDashboardApp', {
                   delete release_dates[fid];
                 }
               });
+            }
 
-              remaining_stories -= c.length;
-              if (remaining_stories == 0) {
-                that.construct_series(release_dates, stories, release_lookups);
-              }
+            if (remaining_stories == 0) {
+              that.construct_series(release_dates, stories, release_lookups);
             }
           }
         }
