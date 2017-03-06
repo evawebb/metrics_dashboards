@@ -20,7 +20,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     this.start(function() {
       that.first_run = true;
       that.ts = that.getContext().getTimeboxScope();
-      that.fetch_iterations(that.ts, []);
+      that.fetch_iterations(that.ts, [], true);
     });
   },
 
@@ -29,7 +29,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     this.start(function() {
       that.first_run = true;
       that.ts = ts;
-      that.fetch_iterations(ts, []);
+      that.fetch_iterations(ts, [], true);
     });
   },
 
@@ -37,7 +37,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     var that = this;
     this.start(function() {
       that.first_run = true;
-      that.fetch_iterations(that.ts, []);
+      that.fetch_iterations(that.ts, [], true);
     });
   },
 
@@ -50,7 +50,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     }
   },
 
-  fetch_iterations: function(ts, excluded_its) {
+  fetch_iterations: function(ts, excluded_its, filter_ip) {
     this._mask.msg = 'Fetching iterations...';
     this._mask.show();
     var that = this;
@@ -85,6 +85,14 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       callback: function(records, operation) {
         var t2 = new Date();
         console.log('Iterations query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+        if (filter_ip) {
+          records.forEach(function(it) {
+            if (it.get('Name').includes('IP')) {
+              excluded_its.push(it.get('Name'));
+            }
+          });
+        }
 
         if (operation.wasSuccessful()) {
           that.fetch_stories(records, excluded_its);
@@ -181,7 +189,8 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       total_planned: 0,
       accepted: {},
       capacities: [],
-      progress: {}
+      progress_plan: {},
+      progress_all: {}
     };
 
     for (var i = 0; i < iterations.length; i += 1) {
@@ -212,7 +221,8 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     });
 
     for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
-      data.progress[d.toDateString()] = 0;
+      data.progress_plan[d.toDateString()] = 0;
+      data.progress_all[d.toDateString()] = 0;
     }
 
     var first_date = new Date(that.start_date).toDateString();
@@ -221,6 +231,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
 
       if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
         var a_date = s.get('AcceptedDate');
+        var a_date_s = a_date.toDateString();
 
         if (s.get('Feature')) {
           data.total_planned += s.get('PlanEstimate');
@@ -231,13 +242,18 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
               r.amt += s.get('PlanEstimate');
             }
           });
+
+          if (data.progress_plan.hasOwnProperty(a_date_s)) {
+            data.progress_plan[a_date_s] += s.get('PlanEstimate');
+          } else if (new Date(a_date_s) < new Date(first_date)) {
+            data.progress_plan[first_date] += s.get('PlanEstimate');
+          }
         }
 
-        a_date = a_date.toDateString();
-        if (data.progress.hasOwnProperty(a_date)) {
-          data.progress[a_date] += s.get('PlanEstimate');
-        } else if (new Date(a_date) < new Date(first_date)) {
-          data.progress[first_date] += s.get('PlanEstimate');
+        if (data.progress_all.hasOwnProperty(a_date_s)) {
+          data.progress_all[a_date_s] += s.get('PlanEstimate');
+        } else if (new Date(a_date_s) < new Date(first_date)) {
+          data.progress_all[first_date] += s.get('PlanEstimate');
         }
       }
     });
@@ -247,14 +263,17 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       var prev_d = d.toDateString();
       d.setDate(d.getDate() + 1);
 
-      if (data.progress.hasOwnProperty(d.toDateString())) {
-        data.progress[d.toDateString()] += data.progress[prev_d];
+      if (data.progress_all.hasOwnProperty(d.toDateString())) {
+        data.progress_plan[d.toDateString()] += data.progress_plan[prev_d];
+        data.progress_all[d.toDateString()] += data.progress_all[prev_d];
       } else {
         break;
       }
     }
 
     that.build_table(data);
+    that.add({ xtype: 'component', html: '<hr />' });
+    that.build_plan_progress_graph(data);
     that.add({ xtype: 'component', html: '<hr />' });
     that.build_feature_graph(data);
 
@@ -297,10 +316,92 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     });
   },
 
+  build_plan_progress_graph: function(data) {
+    var that = this;
+
+    var first_date = new Date();
+    var last_date = new Date(0);
+    Object.keys(data.accepted).forEach(function(it) {
+      if (data.accepted[it].start < first_date) {
+        first_date = data.accepted[it].start;
+      }
+      if (data.accepted[it].end > last_date) {
+        last_date = data.accepted[it].end;
+      }
+    });
+
+    var accepted_plan = [];
+    var categories = [];
+    var today_index = -1;
+    for (var d = first_date; d <= last_date; d.setDate(d.getDate() + 1)) {
+      var dtds = d.toDateString();
+      categories.push(dtds);
+
+      if (today_index < 0) {
+        accepted_plan.push(data.progress_plan[dtds]);
+      }
+
+      if (dtds == new Date().toDateString()) {
+        today_index = categories.length - 1;
+      }
+    }
+
+    var goal_line = [
+      {
+        x: 0,
+        y: 0
+      }, 
+      {
+        x: categories.length - 1,
+        y: data.total_planned
+      }
+    ];
+
+    var series = [
+      {
+        name: 'Goal',
+        data: goal_line
+      }, 
+      {
+        name: 'Accepted',
+        data: accepted_plan
+      }
+    ]
+
+    var plan_progress_chart = this.add({
+      xtype: 'rallychart',
+      loadMask: false,
+      chartData: { series: series, categories: categories },
+      chartConfig: {
+        chart: { type: 'area' },
+        title: { text: 'Planned Work Progress' },
+        xAxis: {
+          title: { enabled: false },
+          tickInterval: 7,
+          labels: { rotation: -20 },
+          plotLines: [{
+            color: 'black',
+            value: today_index,
+            width: 2,
+            label: { text: 'Today' }
+          }]
+        },
+        yAxis: {
+          title: { text: 'Total points' },
+          min: 0,
+          max: data.total_planned
+        },
+        plotOptions: { area: {
+          marker: { enabled: false }
+        } }
+      }
+    });
+  },
+
   build_feature_graph: function(data) {
     var that = this;
 
-    var accepted = [];
+    var accepted_all = [];
     var categories = [];
     var capacity = [];
     var today_index = -1;
@@ -311,7 +412,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       categories.push(dtds);
 
       if (today_index < 0) {
-        accepted.push(data.progress[dtds]);
+        accepted_all.push(data.progress_all[dtds]);
       }
 
       if (
@@ -334,18 +435,18 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
         data: capacity
       },
       {
-        name: 'Accepted',
-        data: accepted
+        name: 'Accepted (all)',
+        data: accepted_all
       }
     ];
 
-    var feature_chart = this.add({
+    var all_work_chart = this.add({
       xtype: 'rallychart',
       loadMask: false,
       chartData: { series: series, categories: categories },
       chartConfig: {
         chart: { type: 'area' },
-        title: { text: 'Work Accepted vs. Capacity' },
+        title: { text: 'All Work Accepted vs. Capacity' },
         subtitle: { text: 'This includes all work completed, not just planned feature work' },
         xAxis: { 
           title: { enabled: false },
@@ -376,7 +477,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       excluded_its.splice(excluded_its.indexOf(object), 1);
     }
 
-    this.fetch_iterations(this.ts, excluded_its);
+    this.fetch_iterations(this.ts, excluded_its, false);
   }
 });
 
