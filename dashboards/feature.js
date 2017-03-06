@@ -185,255 +185,286 @@ Ext.define('ZzacksFeatureDashboardApp', {
     });
   },
 
-  fetch_committed_features: function(release_names, features, release_lookups) {
-    this._mask.msg = 'Fetching features... (' + release_names.length + ' releases left)';
+  fetch_committed_features: function(release_names) {
+    this._mask.msg = 'Fetching features...';
     this._mask.show();
-
     var that = this;
-    
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'Release'],
-      filters: [
-        {
-          property: 'Release.Name',
-          value: release_names[0]
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        if (operation.wasSuccessful()) {
-          records.forEach(function(r) {
-            release_lookups[r.get('Name')] = release_names[0];
-          });
-          features = features.concat(records);
-        }
-        release_names.shift();
 
-        if (release_names.length > 0) {
-          this.fetch_committed_features(release_names, features, release_lookups);
-        } else {
-          this.fetch_unscheduled_features(features, release_lookups, 0, []);
+    var remaining_releases = release_names.length;
+    var features = [];
+    var release_lookups = {};
+
+    release_names.forEach(function(r) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['PortfolioItem/Feature'],
+        fetch: ['Name', 'Release'],
+        filters: [
+          {
+            property: 'Release.Name',
+            value: r
+          }
+        ]
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Committed features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          that._mask.msg = 'Fetching features... (' + (remaining_releases - 1) + ' releases remaining)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            records.forEach(function(f) {
+              release_lookups[f.get('Name')] = r;
+            });
+            features = features.concat(records);
+          }
+
+          remaining_releases -= 1;
+          if (remaining_releases == 0) {
+            that.fetch_unscheduled_features(features, release_lookups);
+          }
         }
-      }
+      });
     });
   },
 
-  fetch_unscheduled_features: function(features, release_lookups, index, unsched_features) {
+  fetch_unscheduled_features: function(features, release_lookups) {
     this._mask.msg = 'Fetching unscheduled features...';
     this._mask.show();
     var that = this;
 
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['PortfolioItem/Feature'],
-      fetch: ['Name', 'Release', 'ObjectID', 'FormattedID', 'RevisionHistory'],
-      filters: [
-        {
-          property: 'Release.Name',
-          value: null
-        },
-        {
-          property: 'LastUpdateDate',
-          operator: '>=',
-          value: that.releases[index].start_date
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      limit: 1500,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+    var remaining_releases = that.releases.length;
+    var unsched_features = [];
 
-        if (operation.wasSuccessful()) {
-          unsched_features = unsched_features.concat(records);
-        }
+    that.releases.forEach(function(r) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['PortfolioItem/Feature'],
+        fetch: ['Name', 'Release', 'ObjectID', 'FormattedID', 'RevisionHistory'],
+        filters: [
+          {
+            property: 'Release.Name',
+            value: null,
+          },
+          {
+            property: 'LastUpdateDate',
+            operator: '>=',
+            value: r.start_date
+          }
+        ]
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        limit: 1500,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Unscheduled features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-        if (index + 1 < that.releases.length) {
-          that.fetch_unscheduled_features(features, release_lookups, index + 1, unsched_features);
-        } else {
-          that.fetch_unschedule_dates(features, release_lookups, unsched_features);
+          that._mask.msg = 'Fetching unscheduled features... (' + (remaining_releases - 1) + ' releases remaining)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            unsched_features = unsched_features.concat(records);
+          }
+
+          remaining_releases -= 1;
+          if (remaining_releases == 0) {
+            that.fetch_unschedule_dates(features, release_lookups, unsched_features);
+          }
         }
-      }
+      });
     });
   },
 
   fetch_unschedule_dates(features, release_lookups, unsched_features) {
-    this._mask.msg = 'Calculating unscheduled feature dates... (' + unsched_features.length + ' features left)';
+    this._mask.msg = 'Calculating unscheduled feature dates...';
     this._mask.show();
     var that = this;
 
-    var store = Ext.create('Rally.data.wsapi.Store', {
-      model: 'Revision',
-      fetch: ['Description', 'CreationDate'],
-      filters: [
-        {
-          property: 'RevisionHistory.ObjectID',
-          value: unsched_features[0].get('RevisionHistory')
-            ._ref.split('/').reverse()[0]
-        }
-      ],
-      sorters: [
-        {
-          property: 'RevisionNumber',
-          direction: 'ASC'
-        }
-      ]
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        var relevant = false;
-        if (operation.wasSuccessful()) {
-          var r_filt = records.filter(function(r) {
-            return r.get('Description').match(/RELEASE removed/);
-          });
-          
-          if (r_filt.length > 0) {
-            relevant = true;
-            r_filt.forEach(function(r) {
-              release_lookups[unsched_features[0].get('Name')] = 
-                r.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
-              that.drops[unsched_features[0].get('ObjectID')] = 
-                r.get('CreationDate').toDateString();
+    var remaining_features = unsched_features.length;
+
+    unsched_features.forEach(function(f) {
+      var store = Ext.create('Rally.data.wsapi.Store', {
+        model: 'Revision',
+        fetch: ['Description', 'CreationDate'],
+        filters: [
+          {
+            property: 'RevisionHistory.ObjectID',
+            value: f.get('RevisionHistory')._ref.split('/').reverse()[0]
+          }
+        ],
+        sorters: [
+          {
+            property: 'RevisionNumber',
+            direction: 'ASC'
+          }
+        ]
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Unscheduled dates query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          that._mask.msg = 'Calculating unscheduled feature dates... (' + (remaining_features - 1) + ' features remaining)';
+          that._mask.show();
+
+          var relevant = false;
+          if (operation.wasSuccessful()) {
+            var r_filt = records.filter(function(r) {
+              return r.get('Description').match(/RELEASE removed/);
             });
+
+            if (r_filt.length > 0) {
+              relevant = true;
+              r_filt.forEach(function(h) {
+                release_lookups[f.get('Name')] = 
+                  h.get('Description').match(/RELEASE removed \[(.*?)\]/)[1];
+                that.drops[f.get('ObjectID')] =
+                  h.get('CreationDate').toDateString();
+              });
+            }
+          }
+
+          if (relevant) {
+            features.push(f);
+          }
+
+          remaining_features -= 1;
+          if (remaining_features == 0) {
+            that.fetch_stories(features, release_lookups);
           }
         }
-
-        if (relevant) {
-          features.push(unsched_features.shift());
-        } else {
-          unsched_features.shift();
-        }
-        if (unsched_features.length > 0) {
-          this.fetch_unschedule_dates(features, release_lookups, unsched_features);
-        } else {
-          this.fetch_stories(features, [], release_lookups);
-        }
-      }
-    });
-  },
-
-  fetch_stories: function(features, stories, release_lookups) {
-    this._mask.msg = 'Fetching stories... (' + features.length + ' features left)';
-    this._mask.show();
-    var that = this;
-
-    var feature_oids = features.splice(0, 50).map(function(f) {
-      return f.get('ObjectID');
-    });
-
-    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-      models: ['UserStory', 'Defect'],
-      filters: [
-        {
-          property: 'Feature.ObjectID',
-          operator: 'in',
-          value: feature_oids
-        },
-        {
-          property: 'DirectChildrenCount',
-          value: 0
-        }
-      ],
-      limit: 2000
-    }, this);
-    var t1 = new Date();
-    store.load({
-      scope: this,
-      callback: function(records, operation) {
-        var t2 = new Date();
-        console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-        if (operation.wasSuccessful()) {
-          stories = stories.concat(records);
-        }
-
-        if (features.length > 0) {
-          this.fetch_stories(features, stories, release_lookups);
-        } else {
-          this.fetch_histories(stories, 0, {}, release_lookups);
-        }
-      }
-    });
-  },
-
-  fetch_histories: function(stories, index, release_dates, release_lookups) {
-    this._mask.msg = 'Fetching story histories... (' + (stories.length - index) + ' stories left)';
-    this._mask.show();
-    var that = this;
-
-    var story_oids = stories.slice(index, index + this.histories_cluster_size)
-      .map(function(s) {
-        return s.get('ObjectID');
       });
+    });
+  }, 
 
-    var t1 = new Date();
-    var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-      fetch: [
-        'Name', 'FormattedID', 'ScheduleState', 
-        '_PreviousValues.ScheduleState', 
-        'PlanEstimate', '_ValidFrom'
-      ],
-      hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
-      filters: [
-        {
-          property: 'ObjectID',
-          operator: 'in',
-          value: story_oids
-        }
-      ],
-      listeners: {
-        load: function(store, data, success) {
+  fetch_stories: function(features, release_lookups) {
+    this._mask.msg = 'Fetching stories...';
+    this._mask.show();
+    var that = this;
+
+    var remaining_features = features.length;
+    var feature_clusters = [];
+    while (features.length > 0) {
+      feature_clusters.push(features.splice(0, 50).map(function(f) {
+        return f.get('ObjectID');
+      }));
+    }
+    var stories = [];
+
+    feature_clusters.forEach(function(c) {
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['UserStory', 'Defect'],
+        filters: [
+          {
+            property: 'Feature.ObjectID',
+            operator: 'in',
+            value: c
+          },
+          {
+            property: 'DirectChildrenCount',
+            value: 0
+          }
+        ],
+        limit: 2000
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
           var t2 = new Date();
-          console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
-          if (success) {
-            data.filter(function(d) {
-              return (
-                (
-                  d.get('_PreviousValues.ScheduleState')
-                  && d.get('_PreviousValues.ScheduleState').length > 0
-                )
-                || d.get('_PreviousValues.ScheduleState') === null
-              );
-            }).forEach(function(d) {
-              var fid = d.get('FormattedID');
-              if (d.get('ScheduleState') == 'Released') {
-                release_dates[fid] = new Date(d.get('_ValidFrom')).toDateString();
-              } else {
-                delete release_dates[fid];
+          console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          that._mask.msg = 'Fetching stories... (' + (remaining_features - c.length) + ' features remaining)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            stories = stories.concat(records);
+          }
+
+          remaining_features -= c.length;
+          if (remaining_features == 0) {
+            that.fetch_histories(stories, release_lookups);
+          }
+        }
+      });
+    });
+  },
+
+  fetch_histories: function(stories, release_lookups) {
+    this._mask.msg = 'Fetching story histories...';
+    this._mask.show();
+    var that = this;
+
+    var remaining_stories = stories.length;
+    var story_clusters = [];
+    for (var i = 0; i < stories.length; i += that.histories_cluster_size) {
+      story_clusters.push(stories.slice(i, i + that.histories_cluster_size)
+        .map(function(s) {
+          return s.get('ObjectID');
+        })
+      );
+    }
+    var release_dates = {};
+
+    story_clusters.forEach(function(c) {
+      var t1 = new Date();
+      var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+        fetch: [
+          'Name', 'FormattedID', 'ScheduleState',
+          '_PreviousValues.ScheduleState',
+          'PlanEstimate', '_Validfrom'
+        ],
+        hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
+        filters: [
+          {
+            property: 'ObjectID',
+            operator: 'in',
+            value: c
+          }
+        ],
+        listeners: {
+          load: function(store, data, success) {
+            var t2 = new Date();
+            console.log('Story histories query took', (t2 - t1), 'ms, and retrieved', data ? data.length : 0, 'results.');
+
+            that._mask.msg = 'Fetching story histories... (' + (remaining_stories - c.length) + ' stories remaining)';
+            that._mask.show();
+
+            if (success) {
+              data.filter(function(d) {
+                return (
+                  (
+                    d.get('_PreviousValues.ScheduleState') &&
+                    d.get('_PreviousValues.ScheduleState').length > 0
+                  ) ||
+                  d.get('_PreviousValues.ScheduleState') === null
+                );
+              }).forEach(function(d) {
+                var fid = d.get('FormattedID');
+                if (d.get('ScheduleState') == 'Released') {
+                  release_dates[fid] = new Date(d.get('_ValidFrom')).toDateString();
+                } else {
+                  delete release_dates[fid];
+                }
+              });
+
+              remaining_stories -= c.length;
+              if (remaining_stories == 0) {
+                that.construct_series(release_dates, stories, release_lookups);
               }
-            });
-            
-            if (index + that.histories_cluster_size < stories.length) {
-              that.fetch_histories(
-                stories, 
-                index + that.histories_cluster_size, 
-                release_dates, 
-                release_lookups
-              );
-            } else {
-              that.construct_series(
-                release_dates, 
-                stories, 
-                release_lookups
-              );
             }
           }
         }
-      }
+      });
+      t1 = new Date();
+      store.load({ scope: that });
     });
-    t1 = new Date();
-    store.load({ scope: this });
   },
 
   construct_series: function(release_dates, stories, release_lookups) {
