@@ -160,12 +160,11 @@ Ext.define('ZzacksInitiativeDashboardApp', {
       store.load({
         scope: this,
         callback: function(records, operation) {
-          var init_list = [];
           if (operation.wasSuccessful()) {
-            init_list = records;
+            that.filter_initiatives(ts, records);
           }
 
-          that.filter_initiatives(ts, init_list);
+          that.haltEarly('No initiatives found.');
         }
       });
     } else {
