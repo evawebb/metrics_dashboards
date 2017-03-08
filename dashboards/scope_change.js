@@ -2,6 +2,28 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
   histories_cluster_size: 200,
+  colors: [
+    '#ffb300',
+    '#803e75',
+    '#ff6800',
+    '#a6bdd7',
+    '#c10020',
+    '#cea262',
+    '#817066',
+    '#007d34',
+    '#f6768e',
+    '#00538a',
+    '#ff7a5c',
+    '#53377a',
+    '#ff8e00',
+    '#b32851',
+    '#f4c800',
+    '#7f180d',
+    '#93aa00',
+    '#593315',
+    '#f13a13',
+    '#232c16'
+  ],
 
   getUserSettingsFields: function() {
     return [];
@@ -84,17 +106,30 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       callback: function(records, operation) {
         var t2 = new Date();
         console.log('Features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
         if (operation.wasSuccessful()) {
           var data = {};
           records.forEach(function(f) {
             data[f.get('FormattedID')] = {
               name: f.get('Name'),
               scope_est: f.get('RefinedEstimate'),
-              scope_est_h: 0,
+              // scope_est_h: 0,
+              scope_est_a: 0,
               scope_act: 0,
-              scope_chg: -f.get('RefinedEstimate')
+              scope_chg: -f.get('RefinedEstimate'),
+              progress: {}
             };
           });
+
+          for (
+            var d = new Date(release.record.raw.ReleaseStartDate);
+            d < new Date(release.record.raw.ReleaseDate);
+            d.setDate(d.getDate() + 1)
+          ) {
+            records.forEach(function(f) {
+              data[f.get('FormattedID')].progress[d.toDateString()] = 0;
+            });
+          }
 
           that.fetch_stories(release, records, data);
         } else {
@@ -146,6 +181,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
           that._mask.show();
 
           if (operation.wasSuccessful()) {
+            var first_date, second_date, last_date;
             records.forEach(function(s) {
               var ffid = s.get('Feature').FormattedID;
               if (data[ffid]) {
@@ -154,19 +190,54 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               } else {
                 console.log('Weird story!', s);
               }
+
+              if (!first_date) {
+                var k = Object.keys(data[ffid].progress);
+                first_date = k[0];
+                second_date = k[1];
+                last_date = k[k.length - 1];
+              }
+
+              var dtds = s.get('CreationDate').toDateString();
+              if (data[ffid].progress.hasOwnProperty(dtds)) {
+                data[ffid].progress[dtds] += s.get('PlanEstimate');
+              } else if (new Date(dtds) < new Date(first_date)) {
+                data[ffid].progress[first_date] += s.get('PlanEstimate');
+                data[ffid].scope_est_a += s.get('PlanEstimate');
+              }
             });
             stories = stories.concat(records);
           }
 
           if (remaining_features == 0) {
-            that.fetch_historical_estimates(release, stories, data);
+            Object.keys(data).forEach(function(ffid) {
+              for (
+                var d = new Date(second_date); 
+                d <= new Date(last_date); 
+                d.setDate(d.getDate() + 1)
+              ) {
+                var prev = new Date(d);
+                prev.setDate(d.getDate() - 1);
+                data[ffid].progress[d.toDateString()] += 
+                  data[ffid].progress[prev.toDateString()];
+              }
+            });
+
+            that.removeAll();
+            // that.fetch_historical_estimates(release, stories, data);
+            var sorted_ffids = that.sort_data(Object.keys(data), data);
+            that.build_table(data, sorted_ffids);
+            that.build_chart(release, data, sorted_ffids.slice(0, 10));
+
+            this._mask.hide();
+            this.locked = false;
           }
         }
       });
     });
   },
 
-  fetch_historical_estimates: function(release, stories, data) {
+  /* fetch_historical_estimates: function(release, stories, data) {
     var remaining_stories = stories.length;
     this._mask.msg = 'Fetching feature estimates... (' + remaining_stories + ' stories remaining)';
     this._mask.show();
@@ -187,7 +258,12 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       feature_fid_clusters.push(feature_fid_cluster);
     }
 
-    [0, 1, 2, 3].forEach(function(i) {
+    // Thanks, Javascript.
+    var indices = [];
+    for (var i = 0; i < story_clusters.length; i += 1) {
+      indices.push(i);
+    }
+    indices.forEach(function(i) {
       var story_oids = story_clusters[i];
       var feature_fids = feature_fid_clusters[i];
 
@@ -243,7 +319,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       t1 = new Date();
       store.load({ scope: that });
     });
-  },
+  }, */
 
   sort_data: function(fids, data) {
     if (fids.length > 1) {
@@ -278,16 +354,18 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       '<thead><tr>' + 
       '<th class="bold tablecell">Formatted ID</th>' +
       '<th class="bold tablecell">Name</th>' + 
+      '<th class="bold tablecell">Actual Starting Scope</th>' +
       '<th class="bold tablecell">Refined Estimate</th>' + 
-      '<th class="bold tablecell">Refined Estimate (LBAPI)</th>' +
-      '<th class="bold tablecell">Actual Scope</th>' +
+      // '<th class="bold tablecell">Refined Estimate (LBAPI)</th>' +
+      '<th class="bold tablecell">Actual Current Scope</th>' +
       '<th class="bold tablecell">Scope Change</th>' +
       '<th class="bold tablecell">Percent Scope Change</th>' +
       '</tr></thead>';
 
     var totals = {
       scope_est: 0,
-      scope_est_h: 0,
+      // scope_est_h: 0,
+      scope_est_a: 0,
       scope_act: 0,
       scope_chg: 0
     };
@@ -298,9 +376,11 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       table += '<td class="tablecell center">';
       table += data[fid].name + '</td>';
       table += '<td class="tablecell center">';
-      table += data[fid].scope_est + '</td>';
+      table += data[fid].scope_est_a + '</td>';
       table += '<td class="tablecell center">';
-      table += data[fid].scope_est_h + '</td>';
+      table += data[fid].scope_est + '</td>';
+      // table += '<td class="tablecell center">';
+      // table += data[fid].scope_est_h + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_act + '</td>';
       table += '<td class="tablecell center">';
@@ -323,9 +403,11 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     table += '<td class="tablecell bold">';
     table += 'Total</td>';
     table += '<td class="tablecell bold">';
-    table += totals.scope_est + '</td>';
+    table += totals.scope_est_a + '</td>';
     table += '<td class="tablecell bold">';
-    table += totals.scope_est_h + '</td>';
+    table += totals.scope_est + '</td>';
+    // table += '<td class="tablecell bold">';
+    // table += totals.scope_est_h + '</td>';
     table += '<td class="tablecell bold">';
     table += totals.scope_act + '</td>';
     table += '<td class="tablecell bold">';
@@ -344,8 +426,64 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       xtype: 'component',
       html: table
     });
+  },
 
-    this._mask.hide();
-    this.locked = false;
+  build_chart: function(release, data, enabled_ffids) {
+    var that = this;
+
+    var series = [];
+    var categories = [];
+    var flag = true;
+    var i = 0;
+    Object.keys(data).forEach(function(ffid) {
+      var f_data = [];
+      for (
+        var d = new Date(release.record.raw.ReleaseStartDate);
+        d < new Date(release.record.raw.ReleaseDate) &&
+        d < new Date();
+        d.setDate(d.getDate() + 1)
+      ) {
+        f_data.push(data[ffid].progress[d.toDateString()]);
+        if (flag) {
+          categories.push(d.toDateString());
+        }
+      }
+      flag = false;
+
+      series.push({
+        name: ffid,
+        data: f_data,
+        color: that.colors[i],
+        visible: enabled_ffids.includes(ffid)
+      });
+      i += 1;
+      if (i == that.colors.length) {
+        i = 0;
+      }
+    });
+
+    var chart = that.add({
+      xtype: 'rallychart',
+      loadMask: false,
+      chartData: { series: series, categories: categories },
+      chartConfig: {
+        chart: { type: 'area' },
+        title: { text: 'Actual Scope Over Time' },
+        xAxis: {
+          tickInterval: 7,
+          labels: {
+            rotation: -20
+          }
+        },
+        yAxis: {
+          title: { text: 'Sum of leaf plan estimates (points)' },
+          min: 0
+        },
+        plotOptions: { area: {
+          stacking: 'normal',
+          marker: { enabled: false }
+        } }
+      }
+    });
   }
 });
