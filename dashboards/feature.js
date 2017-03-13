@@ -114,10 +114,22 @@ Ext.define('ZzacksFeatureDashboardApp', {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
+            var deltas = {};
+            Object.keys(cd.deltas).forEach(function(r) {
+              deltas[r] = {};
+              Object.keys(cd.deltas[r]).forEach(function(d) {
+                deltas[r][d] = {};
+                i = 0;
+                cd.delta_keys.forEach(function(k) {
+                  deltas[r][d][k] = cd.deltas[r][d][i];
+                  i += 1;
+                });
+              });
+            });
             that.colors = cd.colors;
             that.releases = cd.releases;
             that.removeAll();
-            that.create_options(cd.deltas, 'Total points');
+            that.create_options(deltas, 'Total points');
           } else {
             that.fetch_releases(ts);
           }
@@ -572,13 +584,34 @@ Ext.define('ZzacksFeatureDashboardApp', {
       }
     });
 
+    that.cache_data(deltas);
+  },
+
+  cache_data: function(deltas) {
+    var that = this;
+
+    console.log(deltas);
+
+    var delta_keys = ['cp', 'cs', 'rp', 'rs'];
+    var cache_delta = {};
+    Object.keys(deltas).forEach(function(r) {
+      cache_delta[r] = {};
+      Object.keys(deltas[r]).forEach(function(d) {
+        cache_delta[r][d] = [];
+        delta_keys.forEach(function(k) {
+          cache_delta[r][d].push(deltas[r][d][k]);
+        });
+      });
+    });
+
     var release = this.releases[0].name;
     var team = this.getContext().getProject().ObjectID;
     var key = this.cache_tag + team + '_' + release;
     this.prefs[key] = JSON.stringify({
       date: new Date(),
       colors: this.colors,
-      deltas: deltas,
+      delta_keys: delta_keys,
+      deltas: cache_delta,
       releases: this.releases
     });
     Rally.data.PreferenceManager.update({
