@@ -117,15 +117,21 @@ Ext.define('ZzacksFeatureDashboardApp', {
             var deltas = {};
             Object.keys(cd.deltas).forEach(function(r) {
               deltas[r] = {};
-              Object.keys(cd.deltas[r]).forEach(function(d) {
-                deltas[r][d] = {};
+              for (
+                var d = new Date(cd.deltas[r].fd);
+                d <= new Date(cd.deltas[r].ld);
+                d.setDate(d.getDate() + 1)
+              ) {
+                var dtds = d.toDateString();
+                deltas[r][dtds] = {};
                 i = 0;
                 cd.delta_keys.forEach(function(k) {
-                  deltas[r][d][k] = cd.deltas[r][d][i];
+                  deltas[r][dtds][k] = cd.deltas[r][dtds][i];
                   i += 1;
                 });
-              });
+              }
             });
+
             that.colors = cd.colors;
             that.releases = cd.releases;
             that.removeAll();
@@ -590,17 +596,20 @@ Ext.define('ZzacksFeatureDashboardApp', {
   cache_data: function(deltas) {
     var that = this;
 
-    console.log(deltas);
-
     var delta_keys = ['cp', 'cs', 'rp', 'rs'];
     var cache_delta = {};
     Object.keys(deltas).forEach(function(r) {
       cache_delta[r] = {};
+      var ds = Object.keys(deltas[r]);
+      cache_delta[r].fd = ds[0];
+      cache_delta[r].ld = ds[ds.length - 1];
+      cache_delta[r].v = [];
       Object.keys(deltas[r]).forEach(function(d) {
-        cache_delta[r][d] = [];
+        var dd = [];
         delta_keys.forEach(function(k) {
-          cache_delta[r][d].push(deltas[r][d][k]);
+          dd.push(deltas[r][d][k]);
         });
+        cache_delta[r].v.push(dd);
       });
     });
 
