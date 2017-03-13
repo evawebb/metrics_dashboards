@@ -5,6 +5,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
   cache_tag: 'cached_data_a_',
+  release_ways: 3,
 
   getUserSettingsFields: function() {
     return [];
@@ -184,53 +185,76 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   },
 
   fetch_artifacts: function(artifacts) {
-    var remaining_releases = this.releases.length * 2;
+    var remaining_releases = this.releases.length * 2 * this.release_ways;
     this._mask.msg = 'Fetching artifacts... (' + remaining_releases + ' releases remaining)';
     this._mask.show();
     var that = this;
 
     ['UserStory', 'Defect'].forEach(function(t) {
       that.releases.forEach(function(r) {
-        var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-          models: [t],
-          filters: [
-            {
-              property: 'AcceptedDate',
-              operator: '>=',
-              value: r.start_date
-            },
-            {
-              property: 'AcceptedDate',
-              operator: '<',
-              value: r.end_date
-            },
-            {
-              property: 'DirectChildrenCount',
-              value: 0
-            }
-          ]
-        }, this);
-        var t1 = new Date();
-        store.load({
-          scope: this,
-          limit: 1500,
-          callback: function(records, operation) {
-            var t2 = new Date();
-            console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+        var step = (r.end_date - r.start_date) / that.release_ways;
+        var dates = [r.start_date];
+        var indices = [0];
+        for (var i = 0; i < that.release_ways; i += 1) {
+          dates[i + 1] = new Date(dates[i]);
+          dates[i + 1].setTime(dates[i + 1].getTime() + step);
+          indices[i] = i;
+        }
+        dates[that.release_ways] = r.end_date;
+        delete indices[that.release_ways];
 
-            remaining_releases -= 1;
-            that._mask.msg = 'Fetching artifacts... (' + remaining_releases + ' releases left)';
-            that._mask.show();
+        indices.forEach(function(i) {
+          var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+            models: [t],
+            filters: [
+              {
+                property: 'AcceptedDate',
+                operator: '>=',
+                value: dates[i]
+              },
+              {
+                property: 'AcceptedDate',
+                operator: '<',
+                value: dates[i + 1]
+              },
+              {
+                property: 'DirectChildrenCount',
+                value: 0
+              }
+            ]
+          }, this);
+          var t1 = new Date();
+          store.load({
+            scope: this,
+            limit: 1000,
+            callback: function(records, operation) {
+              var t2 = new Date();
+              console.log('Artifacts query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
-            if (operation.wasSuccessful()) {
-              var key = (t == 'UserStory') ? 'u' : 'd';
-              artifacts[key][r.name] = records;
-            }
+              if (operation.error) {
+                operation.error.errors.forEach(function(e) {
+                  console.log('Query error:', e);
+                });
+              }
 
-            if (remaining_releases == 0) {
-              that.calculate_deltas(artifacts);
+              remaining_releases -= 1;
+              that._mask.msg = 'Fetching artifacts... (' + remaining_releases + ' releases left)';
+              that._mask.show();
+
+              if (operation.wasSuccessful()) {
+                var key = (t == 'UserStory') ? 'u' : 'd';
+                if (artifacts[key].hasOwnProperty(r.name)) {
+                  artifacts[key][r.name] = artifacts[key][r.name].concat(records);
+                } else {
+                  artifacts[key][r.name] = records;
+                }
+              }
+
+              if (remaining_releases == 0) {
+                that.calculate_deltas(artifacts);
+              }
             }
-          }
+          });
         });
       });
     });
