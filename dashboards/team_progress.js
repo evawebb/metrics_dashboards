@@ -1,6 +1,33 @@
 Ext.define('ZzacksTeamProgressDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
+  data_groups: {
+    planned: 'Planned Work',
+    unplanned: 'Unplanned Stories & Defects',
+    cvdefect: 'CV Defects'
+  },
+  colors: [
+    '#803e75',
+    '#ffb300',
+    '#ff6800',
+    '#a6bdd7',
+    '#c10020',
+    '#cea262',
+    '#817066',
+    '#007d34',
+    '#f6768e',
+    '#00538a',
+    '#ff7a5c',
+    '#53377a',
+    '#ff8e00',
+    '#b32851',
+    '#f4c800',
+    '#7f180d',
+    '#93aa00',
+    '#593315',
+    '#f13a13',
+    '#232c16'
+  ],
   
   getUserSettingsFields: function() {
     return [];
@@ -112,6 +139,10 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     iterations.forEach(function(it) {
       var store = Ext.create('Rally.data.wsapi.artifact.Store', {
         models: ['UserStory', 'Defect'],
+        fetch: [
+          'ScheduleState', 'PlanEstimate', 'AcceptedDate', 'Tags', 
+          'Feature'
+        ],
         filters: [
           {
             property: 'Iteration.Name',
@@ -189,9 +220,13 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       total_planned: 0,
       accepted: {},
       capacities: [],
-      progress_plan: {},
-      progress_uplan: {}
+      progress: {}
     };
+
+    Object.keys(that.data_groups).forEach(function(k) {
+      data.progress[k] = {};
+    });
+    data.progress.all = {};
 
     for (var i = 0; i < iterations.length; i += 1) {
       if (i < iterations.length - 1) {
@@ -221,14 +256,17 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     });
 
     for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
-      data.progress_plan[d.toDateString()] = 0;
-      data.progress_uplan[d.toDateString()] = 0;
+      Object.keys(data.progress).forEach(function(k) {
+        data.progress[k][d.toDateString()] = 0;
+      });
+      data.progress.all[d.toDateString()] = 0;
     }
 
     var first_date = new Date(that.start_date).toDateString();
     stories.forEach(function(s) {
       data.total += s.get('PlanEstimate');
 
+      var progress_key;
       if (s.get('ScheduleState') == 'Released' || s.get('ScheduleState') == 'Accepted') {
         var a_date = s.get('AcceptedDate');
         var a_date_s = a_date.toDateString();
@@ -243,29 +281,36 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
             }
           });
 
-          if (data.progress_plan.hasOwnProperty(a_date_s)) {
-            data.progress_plan[a_date_s] += s.get('PlanEstimate');
-          } else if (new Date(a_date_s) < new Date(first_date)) {
-            data.progress_plan[first_date] += s.get('PlanEstimate');
-          }
+          progress_key = 'planned';
+        } else if (
+          s.get('Tags')._tagsNameArray.map(function(t) { return t.Name; })
+            .includes('Customer Voice')
+        ) {
+          progress_key = 'cvdefect';
         } else {
-          if (data.progress_uplan.hasOwnProperty(a_date_s)) {
-            data.progress_uplan[a_date_s] += s.get('PlanEstimate');
-          } else if (new Date(a_date_s) < new Date(first_date)) {
-            data.progress_uplan[first_date] += s.get('PlanEstimate');
-          }
+          progress_key = 'unplanned';
+        }
+
+        if (data.progress[progress_key].hasOwnProperty(a_date_s)) {
+          data.progress[progress_key][a_date_s] += s.get('PlanEstimate');
+          data.progress.all[a_date_s] += s.get('PlanEstimate');
+        } else if (new Date(a_date_s) < new Date(first_date)) {
+          data.progress[progress_key][first_date] += s.get('PlanEstimate');
+          data.progress.all[first_date] += s.get('PlanEstimate');
         }
       }
     });
 
+    var first_key = Object.keys(data.progress)[0];
     var d = new Date(that.start_date);
     while (true) {
       var prev_d = d.toDateString();
       d.setDate(d.getDate() + 1);
 
-      if (data.progress_uplan.hasOwnProperty(d.toDateString())) {
-        data.progress_plan[d.toDateString()] += data.progress_plan[prev_d];
-        data.progress_uplan[d.toDateString()] += data.progress_uplan[prev_d];
+      if (data.progress[first_key].hasOwnProperty(d.toDateString())) {
+        Object.keys(data.progress).forEach(function(k) {
+          data.progress[k][d.toDateString()] += data.progress[k][prev_d];
+        });
       } else {
         break;
       }
@@ -338,7 +383,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       categories.push(dtds);
 
       if (today_index < 0) {
-        accepted_plan.push(data.progress_plan[dtds]);
+        accepted_plan.push(data.progress.planned[dtds]);
       }
 
       if (dtds == new Date().toDateString()) {
@@ -360,11 +405,13 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     var series = [
       {
         name: 'Goal',
-        data: goal_line
+        data: goal_line,
+        color: that.colors[0]
       }, 
       {
         name: 'Accepted',
-        data: accepted_plan
+        data: accepted_plan,
+        color: that.colors[1]
       }
     ]
 
@@ -401,21 +448,19 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
   build_feature_graph: function(data) {
     var that = this;
 
-    var accepted_plan = [];
-    var accepted_uplan = [];
+    var accepted = {};
     var categories = [];
     var capacity = [];
     var today_index = -1;
     var curr_capacity = 0;
     var iteration_index = 0;
+    Object.keys(that.data_groups).forEach(function(k) {
+      accepted[k] = [];
+    });
+
     for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
       var dtds = d.toDateString();
       categories.push(dtds);
-
-      if (today_index < 0) {
-        accepted_plan.push(data.progress_plan[dtds]);
-        accepted_uplan.push(data.progress_uplan[dtds]);
-      }
 
       if (
         iteration_index < data.capacities.length &&
@@ -426,6 +471,17 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       }
       capacity.push(curr_capacity);
 
+      if (today_index < 0) {
+        Object.keys(that.data_groups).forEach(function(k) {
+          accepted[k].push({
+            y: data.progress[k][dtds],
+            date: dtds,
+            percent_of_capacity: (data.progress[k][dtds] / curr_capacity * 100).toFixed(2),
+            percent_of_accepted: (data.progress[k][dtds] / data.progress.all[dtds] * 100).toFixed(2)
+          });
+        });
+      }
+
       if (dtds == new Date().toDateString()) {
         today_index = categories.length - 1;
       }
@@ -435,19 +491,21 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       {
         name: 'Capacity',
         data: capacity,
+        color: that.colors[0],
         stack: 'none'
-      },
-      {
-        name: 'Accepted (planned)',
-        data: accepted_plan,
-        stack: 'accepted'
-      },
-      {
-        name: 'Accepted (unplanned)',
-        data: accepted_uplan,
-        stack: 'accepted'
       }
     ];
+
+    i = 1;
+    Object.keys(that.data_groups).forEach(function(k) {
+      series.push({
+        name: that.data_groups[k],
+        data: accepted[k],
+        color: that.colors[i],
+        stack: 'accepted'
+      });
+      i += 1;
+    });
 
     var all_work_chart = this.add({
       xtype: 'rallychart',
@@ -471,6 +529,14 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
         yAxis: { 
           title: { text: 'Total points' },
           min: 0
+        },
+        tooltip: {
+          headerFormat: '',
+          pointFormat:
+            '<b>{series.name}:</b> {point.y} points<br />' +
+            '{point.percent_of_accepted}% of accepted points<br />' +
+            '{point.percent_of_capacity}% of capacity<br />' +
+            '<span style="font-size: 10px">{point.date}</span><br />'
         },
         plotOptions: { area: {
           marker: { enabled: false },
