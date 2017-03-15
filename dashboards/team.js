@@ -11,6 +11,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     'RevisionHistory',
     'Revisions',
     'KanbanRevisions',
+    'KanbanRevisionsSimple',
     'CreationDate',
     'InProgressDate',
     'AcceptedDate',
@@ -263,50 +264,77 @@ Ext.define('ZzacksTeamDashboardApp', {
 
   // Fetch the allowed kanban states so the order is known.
   fetch_kanban_states: function(stories) {
+    var branches = 2;
     this._mask.msg = 'Fetching kanban states...';
     this._mask.show();
 
     var that = this;
 
-    this.kanban_states = [];
-    this.kanban_votes = {};
+    var local_kanban_states = [];
+    var local_kanban_votes = {};
+    var local_kanban_states_simple = [];
+    var local_kanban_votes_simple = {};
     Rally.data.ModelFactory.getModel({
-    type: 'UserStory',
-    success: function(model) {
-      model.getField('c_KanbanState').getAllowedValueStore().load({
-        callback: function(records, operation, success) {
-          if (success) {
-            records.forEach(function(r) {
-              that.kanban_states[r.get('ValueIndex')] = r.get('StringValue');
-              that.kanban_votes[r.get('StringValue')] = 0;
-            });
-          } else {
-            console.log(':(');
-          }
+      type: 'UserStory',
+      success: function(model) {
+        model.getField('c_KanbanState').getAllowedValueStore().load({
+          callback: function(records, operation, success) {
+            if (success) {
+              records.forEach(function(r) {
+                local_kanban_states[r.get('ValueIndex')] = r.get('StringValue');
+                local_kanban_votes[r.get('StringValue')] = 0;
+              });
+            } else {
+              console.log(':(');
+            }
 
-          that.fetch_histories(stories);
-        }
-      });
-    }
+            branches -= 1;
+            if (branches == 0) {
+              that.fetch_histories(stories, local_kanban_states, local_kanban_votes, local_kanban_states_simple, local_kanban_votes_simple);
+            }
+          }
+        });
+
+        model.getField('c_KanbanStateSimple').getAllowedValueStore().load({
+          callback: function(records, operation, success) {
+            if (success) {
+              records.forEach(function(r) {
+                local_kanban_states_simple[r.get('ValueIndex')] = r.get('StringValue');
+                local_kanban_votes_simple[r.get('StringValue')] = 0;
+              });
+            } else {
+              console.log(':(');
+            }
+
+            branches -= 1;
+            if (branches == 0) {
+              that.fetch_histories(stories, local_kanban_states, local_kanban_votes, local_kanban_states_simple, local_kanban_votes_simple);
+            }
+          }
+        });
+      }
     });
   }, 
 
   // Fetch the revisions for all the stories.
-  fetch_histories: function(stories) {
+  fetch_histories: function(stories, local_kanban_states, local_kanban_votes, local_kanban_states_simple, local_kanban_votes_simple) {
     this._mask.msg = 'Fetching story histories...';
     this._mask.show();
+    var that = this;
 
     var hashed_stories = {};
     stories.forEach(function(s) {
       s.data.Revisions = [];
       s.data.KanbanRevisions = [];
+      s.data.KanbanRevisionsSimple = [];
       hashed_stories[s.get('ObjectID')] = s;
     });
 
-    var that = this;
+    var kanban_count = 0;
+    var kanban_count_simple = 0;
     var t1 = new Date();
     var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-      fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom', 'c_KanbanState', '_PreviousValues.c_KanbanState'],
+      fetch: ['ScheduleState', '_PreviousValues.ScheduleState', '_ValidFrom', 'c_KanbanState', '_PreviousValues.c_KanbanState', 'c_KanbanStateSimple', '_PreviousValues.c_KanbanStateSimple'],
       hydrate: ['ScheduleState', '_PreviousValues.ScheduleState'],
       filters: [
         {
@@ -349,16 +377,43 @@ Ext.define('ZzacksTeamDashboardApp', {
                   to: d.get('c_KanbanState'),
                   on: d.get('_ValidFrom')
                 });
-                that.kanban_votes[d.get('_PreviousValues.c_KanbanState')] += 1;
-                that.kanban_votes[d.get('c_KanbanState')] += 1;
+                local_kanban_votes[d.get('_PreviousValues.c_KanbanState')] += 1;
+                local_kanban_votes[d.get('c_KanbanState')] += 1;
+                kanban_count += 1;
+              }
+
+              if (
+                (
+                  d.get('_PreviousValues.c_KanbanStateSimple')
+                  && d.get('_PreviousValues.c_KanbanStateSimple').length > 0
+                )
+                || d.get('_PreviousValues.c_KanbanStateSimple') === null
+              ) {
+                hashed_stories[d.get('ObjectID')].data.KanbanRevisionsSimple.push({
+                  from: d.get('_PreviousValues.c_KanbanStateSimple'),
+                  to: d.get('c_KanbanStateSimple'),
+                  on: d.get('_ValidFrom')
+                });
+                local_kanban_votes_simple[d.get('_PreviousValues.c_KanbanStateSimple')] += 1;
+                local_kanban_votes_simple[d.get('c_KanbanStateSimple')] += 1;
+                kanban_count_simple += 1;
               }
             });
           }
 
-          that.kanban_states = that.kanban_states.filter(function(k) {
-            // return that.kanban_votes[k] > 0;
-            return that.kanban_votes[k] / stories.length > 0.25;
+          local_kanban_states = local_kanban_states.filter(function(k) {
+            return local_kanban_votes[k] / stories.length > 0.25;
           });
+          local_kanban_states_simple = local_kanban_states_simple.filter(function(k) {
+            return local_kanban_votes_simple[k] / stories.length > 0.25;
+          });
+
+          if (kanban_count >= kanban_count_simple) {
+            that.kanban_states = local_kanban_states;
+          } else {
+            that.kanban_states = local_kanban_states_simple;
+            that.kanban_simple = true;
+          }
 
           that.get_story_data(stories, []);
         }
@@ -1006,7 +1061,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     });
 
     stories.forEach(function(s) {
-      s.KanbanRevisions.forEach(function(t) {
+      (that.kanban_simple ? s.KanbanRevisionsSimple : s.KanbanRevisions).forEach(function(t) {
         var date = new Date(t.on);
         if (totals[date.toDateString()]) {
           totals[date.toDateString()][t.to] += 1;
