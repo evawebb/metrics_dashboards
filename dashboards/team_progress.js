@@ -190,7 +190,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       accepted: {},
       capacities: [],
       progress_plan: {},
-      progress_all: {}
+      progress_uplan: {}
     };
 
     for (var i = 0; i < iterations.length; i += 1) {
@@ -222,7 +222,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
 
     for (var d = new Date(that.start_date); d <= new Date(that.end_date); d.setDate(d.getDate() + 1)) {
       data.progress_plan[d.toDateString()] = 0;
-      data.progress_all[d.toDateString()] = 0;
+      data.progress_uplan[d.toDateString()] = 0;
     }
 
     var first_date = new Date(that.start_date).toDateString();
@@ -248,12 +248,12 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
           } else if (new Date(a_date_s) < new Date(first_date)) {
             data.progress_plan[first_date] += s.get('PlanEstimate');
           }
-        }
-
-        if (data.progress_all.hasOwnProperty(a_date_s)) {
-          data.progress_all[a_date_s] += s.get('PlanEstimate');
-        } else if (new Date(a_date_s) < new Date(first_date)) {
-          data.progress_all[first_date] += s.get('PlanEstimate');
+        } else {
+          if (data.progress_uplan.hasOwnProperty(a_date_s)) {
+            data.progress_uplan[a_date_s] += s.get('PlanEstimate');
+          } else if (new Date(a_date_s) < new Date(first_date)) {
+            data.progress_uplan[first_date] += s.get('PlanEstimate');
+          }
         }
       }
     });
@@ -263,9 +263,9 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       var prev_d = d.toDateString();
       d.setDate(d.getDate() + 1);
 
-      if (data.progress_all.hasOwnProperty(d.toDateString())) {
+      if (data.progress_uplan.hasOwnProperty(d.toDateString())) {
         data.progress_plan[d.toDateString()] += data.progress_plan[prev_d];
-        data.progress_all[d.toDateString()] += data.progress_all[prev_d];
+        data.progress_uplan[d.toDateString()] += data.progress_uplan[prev_d];
       } else {
         break;
       }
@@ -401,7 +401,8 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
   build_feature_graph: function(data) {
     var that = this;
 
-    var accepted_all = [];
+    var accepted_plan = [];
+    var accepted_uplan = [];
     var categories = [];
     var capacity = [];
     var today_index = -1;
@@ -412,7 +413,8 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
       categories.push(dtds);
 
       if (today_index < 0) {
-        accepted_all.push(data.progress_all[dtds]);
+        accepted_plan.push(data.progress_plan[dtds]);
+        accepted_uplan.push(data.progress_uplan[dtds]);
       }
 
       if (
@@ -432,11 +434,18 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     var series = [
       {
         name: 'Capacity',
-        data: capacity
+        data: capacity,
+        stack: 'none'
       },
       {
-        name: 'Accepted (all)',
-        data: accepted_all
+        name: 'Accepted (planned)',
+        data: accepted_plan,
+        stack: 'accepted'
+      },
+      {
+        name: 'Accepted (unplanned)',
+        data: accepted_uplan,
+        stack: 'accepted'
       }
     ];
 
@@ -464,7 +473,8 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
           min: 0
         },
         plotOptions: { area: {
-          marker: { enabled: false }
+          marker: { enabled: false },
+          stacking: 'normal'
         } }
       }
     });
