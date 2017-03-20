@@ -82,6 +82,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     this._mask.show();
     var that = this;
 
+    that.release = ts.record.raw.Name;
     that.start_date = ts.record.raw.ReleaseStartDate;
     that.end_date = ts.record.raw.ReleaseDate;
 
@@ -136,38 +137,31 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
 
     var stories = [];
 
-    iterations.forEach(function(it) {
-      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
-        models: ['UserStory', 'Defect'],
-        fetch: [
-          'ScheduleState', 'PlanEstimate', 'AcceptedDate', 'Tags', 
-          'Feature'
-        ],
-        filters: [
-          {
-            property: 'Iteration.Name',
-            value: it.get('Name')
-          }
-        ]
-      }, this);
-      var t1 = new Date();
-      store.load({
-        scope: this,
-        callback: function(records, operation) { 
-          var t2 = new Date();
-          console.log('Stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
-
-          if (operation.wasSuccessful()) {
-            stories = stories.concat(records);
-          }
-
-          remaining_iterations -= 1;
-          if (remaining_iterations == 0) {
-            that.removeAll();
-            that.create_options(iterations, stories, excluded_its);
-          }
+    var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+      models: ['UserStory', 'Defect'],
+      fetch: [
+        'ScheduleState', 'PlanEstimate',
+        'AcceptedDate', 'Tags', 'Feature'
+      ],
+      filters: [
+        {
+          property: 'Release.Name',
+          value: that.release
         }
-      });
+      ],
+      limit: 1000
+    }, this);
+    var t1 = new Date();
+    store.load({
+      scope: this,
+      callback: function(records, operation) {
+        var t2 = new Date();
+        console.log('Artifacts query took', (t2 - t1), 'ms and retrieved', records ? records.length : 0, 'results.');
+        if (operation.wasSuccessful()) {
+          that.removeAll();
+          that.create_options(iterations, records, excluded_its);
+        }
+      }
     });
   },
 
@@ -297,6 +291,10 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
         } else if (new Date(a_date_s) < new Date(first_date)) {
           data.progress[progress_key][first_date] += s.get('PlanEstimate');
           data.progress.all[first_date] += s.get('PlanEstimate');
+        }
+      } else {
+        if (s.get('Feature')) {
+          data.total_planned += s.get('PlanEstimate');
         }
       }
     });
