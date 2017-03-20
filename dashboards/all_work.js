@@ -113,10 +113,28 @@ Ext.define('ZzacksAllWorkDashboardApp', {
           var cd = JSON.parse(prefs[key]);
           var last_update = new Date(cd.date);
           if (new Date() - last_update < that.update_interval) {
+            var deltas = {};
+            Object.keys(cd.deltas).forEach(function(r) {
+              deltas[r] = {};
+              Object.keys(cd.deltas[r]).forEach(function(d) {
+                deltas[r][d] = {};
+                var i = 0;
+                cd.delta_keys_1.forEach(function(k1) {
+                  deltas[r][d][k1] = {};
+                  var j = 0;
+                  cd.delta_keys_2.forEach(function(k2) {
+                    deltas[r][d][k1][k2] = cd.deltas[r][d][i][j];
+                    j += 1;
+                  });
+                  i += 1;
+                });
+              });
+            });
+
             that.colors = cd.colors;
             that.releases = cd.releases;
             that.removeAll();
-            that.create_options(cd.deltas, 'Total points');
+            that.create_options(deltas, 'Total points');
           } else {
             that.fetch_releases(ts);
           }
@@ -206,6 +224,9 @@ Ext.define('ZzacksAllWorkDashboardApp', {
         indices.forEach(function(i) {
           var store = Ext.create('Rally.data.wsapi.artifact.Store', {
             models: [t],
+            fetch: [
+              'AcceptedDate', 'PlanEstimate', 'Tags'
+            ],
             filters: [
               {
                 property: 'AcceptedDate',
@@ -276,11 +297,13 @@ Ext.define('ZzacksAllWorkDashboardApp', {
         r_deltas[d.toDateString()] = {
           ap: {
             u: 0,
-            d: 0
+            d: 0,
+            c: 0
           },
           as: {
             u: 0,
-            d: 0
+            d: 0,
+            c: 0
           }
         };
       }
@@ -305,6 +328,16 @@ Ext.define('ZzacksAllWorkDashboardApp', {
         if (a_date && deltas[r][a_date]) {
           deltas[r][a_date].ap.d += s.get('PlanEstimate');
           deltas[r][a_date].as.d += 1;
+
+          if (s.get('Tags').Count > 0) {
+            var tnames = s.get('Tags')._tagsNameArray.map(function(t) {
+              return t.Name;
+            });
+            if (tnames.includes('Customer Voice')) {
+              deltas[r][a_date].ap.c += s.get('PlanEstimate');
+              deltas[r][a_date].as.c += 1;
+            }
+          }
         } else {
           console.log('Weird story!', s);
         }
@@ -326,6 +359,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
         deltas[r][d_next].as.u += deltas[r][d_prev].as.u;
         deltas[r][d_next].ap.d += deltas[r][d_prev].ap.d;
         deltas[r][d_next].as.d += deltas[r][d_prev].as.d;
+        deltas[r][d_next].ap.c += deltas[r][d_prev].ap.c;
+        deltas[r][d_next].as.c += deltas[r][d_prev].as.c;
         deltas[r][d_next].ap.b =
           deltas[r][d_next].ap.u +
           deltas[r][d_next].ap.d;
@@ -335,13 +370,33 @@ Ext.define('ZzacksAllWorkDashboardApp', {
       }
     });
 
+    var delta_keys_1 = ['ap', 'as'];
+    var delta_keys_2 = ['u', 'd', 'c', 'b'];
+    var cache_delta = {};
+    Object.keys(deltas).forEach(function(r) {
+      cache_delta[r] = {};
+      Object.keys(deltas[r]).forEach(function(d) {
+        var dd = [];
+        delta_keys_1.forEach(function(k1) {
+          var ddd = [];
+          delta_keys_2.forEach(function(k2) {
+            ddd.push(deltas[r][d][k1][k2]);
+          });
+          dd.push(ddd);
+        });
+        cache_delta[r][d] = dd;
+      });
+    });
+
     var release = this.releases[0].name;
     var team = this.getContext().getProject().ObjectID;
     var key = this.cache_tag + team + '_' + release;
     this.prefs[key] = JSON.stringify({
       date: new Date(),
       colors: this.colors,
-      deltas: deltas,
+      delta_keys_1: delta_keys_1,
+      delta_keys_2: delta_keys_2,
+      deltas: cache_delta,
       releases: this.releases
     });
     Rally.data.PreferenceManager.update({
@@ -367,7 +422,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
       xtype: 'rallycombobox',
       itemId: 'artifact_select',
       fieldLabel: 'Artifact type(s):',
-      store: ['Just stories', 'Just defects', 'Both'],
+      store: ['Just stories', 'Just defects', 'Just CV defects', 'Both'],
       listeners: {
         change: {
           fn: that.change_story_types.bind(that)
@@ -394,10 +449,10 @@ Ext.define('ZzacksAllWorkDashboardApp', {
   build_charts: function(deltas, graph_type, artifact_type) {
     this._mask.msg = 'Building chart...';
     this._mask.show();
+    var that = this;
 
     var points = graph_type == 'Total points';
 
-    var that = this;
     var series = [];
     Object.keys(deltas).forEach(function(release) {
       var data = [];
@@ -421,6 +476,8 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     var title_type = 'Stories';
     if (artifact_type == 'd') {
       title_type = 'Defects';
+    } else if (artifact_type == 'c') {
+      title_type = 'Customer Voice Defects';
     } else if (artifact_type == 'b') {
       title_type = 'Both';
     }
@@ -468,17 +525,15 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     if (old_item && this.chart) {
       if (new_item == 'Just stories') {
         this.artifact_type = 'u';
-        this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'u');
       } else if (new_item == 'Just defects') {
         this.artifact_type = 'd';
-        this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'd');
+      } else if (new_item == 'Just CV defects') {
+        this.artifact_type = 'c';
       } else {
         this.artifact_type = 'b';
-        this.remove(this.chart);
-        this.build_charts(this.deltas, this.graph_type, 'b');
       }
+      this.remove(this.chart);
+      this.build_charts(this.deltas, this.graph_type, this.artifact_type);
     }
   },
 
