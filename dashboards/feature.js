@@ -117,6 +117,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
             var deltas = {};
             Object.keys(cd.deltas).forEach(function(r) {
               deltas[r] = {};
+              var i = 0;
               for (
                 var d = new Date(cd.deltas[r].fd);
                 d <= new Date(cd.deltas[r].ld);
@@ -124,11 +125,12 @@ Ext.define('ZzacksFeatureDashboardApp', {
               ) {
                 var dtds = d.toDateString();
                 deltas[r][dtds] = {};
-                i = 0;
+                j = 0;
                 cd.delta_keys.forEach(function(k) {
-                  deltas[r][dtds][k] = cd.deltas[r][dtds][i];
-                  i += 1;
+                  deltas[r][dtds][k] = cd.deltas[r].v[i][j];
+                  j += 1;
                 });
+                i += 1;
               }
             });
 
@@ -402,7 +404,18 @@ Ext.define('ZzacksFeatureDashboardApp', {
           that._mask.show();
 
           if (operation.wasSuccessful()) {
-            stories = stories.concat(records);
+            for (var i = 0; i < records.length; i += 1) {
+              var dupe = false;
+              for (var j = 0; j < stories.length; j += 1) {
+                if (records[i].get('FormattedID') == stories[j].get('FormattedID')) {
+                  dupe = true;
+                  break;
+                }
+              }
+              if (!dupe) {
+                stories.push(records[i]);
+              }
+            }
           }
 
           if (remaining_features == 0) {
@@ -504,22 +517,6 @@ Ext.define('ZzacksFeatureDashboardApp', {
       }
       deltas[r.name] = r_deltas;
     });
-
-    var dedupe = function(i) {
-      for (var j = i + 1; j < stories.length; j += 1) {
-        if (stories[i].get('FormattedID') == stories[j].get('FormattedID')) {
-          stories.splice(j, 1);
-          j -= 1;
-        }
-      }
-
-      if (i + 1 < stories.length) {
-        setTimeout(function() {
-          dedupe(i + 1);
-        }, 0);
-      }
-    };
-    dedupe(0);
 
     stories.forEach(function(s) {
       var release = release_lookups[s.get('Feature').Name];
