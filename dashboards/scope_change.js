@@ -93,6 +93,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
 
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
+      fetch: ['FormattedID', 'Name', 'RefinedEstimate', 'ObjectID', 'RevisionHistory'],
       filters: [
         {
           property: 'Release.Name',
@@ -113,7 +114,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
             data[f.get('FormattedID')] = {
               name: f.get('Name'),
               scope_est: f.get('RefinedEstimate'),
-              // scope_est_h: 0,
               scope_est_a: 0,
               scope_act: 0,
               scope_chg: -f.get('RefinedEstimate'),
@@ -146,10 +146,12 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     var that = this;
 
     var feature_clusters = [];
-    while (features.length > 0) {
-      feature_clusters.push(features.splice(0, 50).map(function(f) {
+    var i = 0;
+    while (i < features.length) {
+      feature_clusters.push(features.slice(i, i + 50).map(function(f) {
         return f.get('ObjectID');
       }));
+      i += 50;
     }
     var stories = [];
 
@@ -223,8 +225,116 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               }
             });
 
+            that.fetch_historical_stories(release, features, stories, data);
+          }
+        }
+      });
+    });
+  },
+
+  fetch_historical_stories: function(release, features, stories, data) {
+    var remaining_features = features.length;
+    var that = this;
+    that._mask.msg = 'Fetching historical stories... (' + remaining_features + ' features remaining)';
+    that._mask.show();
+
+    var up_stories = {};
+
+    features.forEach(function(f) {
+      var store = Ext.create('Rally.data.wsapi.Store', {
+        model: 'Revision',
+        fetch: ['Description', 'CreationDate'],
+        filters: [
+          {
+            property: 'RevisionHistory.ObjectID',
+            value: f.get('RevisionHistory')._ref.split('/').reverse()[0]
+          }
+        ],
+        sorters: [
+          {
+            property: 'RevisionNumber',
+            direction: 'ASC'
+          }
+        ]
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        limit: 2000,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Historical stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          remaining_features -= 1;
+          that._mask.msg = 'Fetching historical stories... (' + remaining_features + ' features remaining)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            up_stories[f.get('FormattedID')] = [];
+            records.forEach(function(r) {
+              if (r.get('Description').indexOf('USERSTORIES removed') != -1) {
+                up_stories[f.get('FormattedID')].push(
+                  r.get('Description').match(/USERSTORIES removed \[(.*?):.*\]/)[1]
+                );
+              }
+            });
+          }
+
+          if (remaining_features == 0) {
+            Object.keys(up_stories).forEach(function(ffid) {
+              if (up_stories[ffid] == 0) {
+                delete up_stories[ffid];
+              }
+            });
+            that.fetch_unparented_stories(release, features, stories, up_stories, data);
+          }
+        }
+      });
+    });
+  },
+
+  fetch_unparented_stories: function(release, features, stories, up_story_fids, data) {
+    var remaining_features = Object.keys(up_story_fids).length;
+    var that = this;
+    that._mask.msg = 'Fetching unparented stories... (' + remaining_features + ' features remaining)';
+    that._mask.show();
+
+    Object.keys(up_story_fids).forEach(function(ffid) {
+      var upsf = up_story_fids[ffid];
+      var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+        models: ['UserStory', 'Defect'],
+        filters: [
+          {
+            property: 'FormattedID',
+            operator: 'in',
+            value: upsf
+          },
+          {
+            property: 'DirectChildrenCount',
+            value: 0
+          }
+        ],
+        limit: 2000
+      }, that);
+      var t1 = new Date();
+      store.load({
+        scope: that,
+        callback: function(records, operation) {
+          var t2 = new Date();
+          console.log('Unparented stories query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
+
+          remaining_features -= 1;
+          that._mask.msg = 'Fetching unparented stories... (' + remaining_features + ' features remaining)';
+          that._mask.show();
+
+          if (operation.wasSuccessful()) {
+            records.forEach(function(r) {
+              data[ffid].scope_est_a += r.get('PlanEstimate');
+            });
+          }
+
+          if (remaining_features == 0) {
             that.removeAll();
-            // that.fetch_historical_estimates(release, stories, data);
             var sorted_ffids = that.sort_data(Object.keys(data), data);
             that.build_table(data, sorted_ffids);
             that.build_chart(release, data, sorted_ffids.slice(0, 10));
@@ -236,90 +346,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       });
     });
   },
-
-  /* fetch_historical_estimates: function(release, stories, data) {
-    var remaining_stories = stories.length;
-    this._mask.msg = 'Fetching feature estimates... (' + remaining_stories + ' stories remaining)';
-    this._mask.show();
-    var that = this;
-
-    var story_clusters = [];
-    var feature_fid_clusters = [];
-    while (stories.length > 0) {
-      var story_cluster = stories.splice(0, that.histories_cluster_size);
-      var feature_fid_cluster = {};
-      story_cluster.forEach(function(s) {
-        feature_fid_cluster[s.get('ObjectID')] = s.get('Feature').FormattedID;
-      });
-      story_cluster = story_cluster.map(function(s) {
-        return s.get('ObjectID');
-      });
-      story_clusters.push(story_cluster);
-      feature_fid_clusters.push(feature_fid_cluster);
-    }
-
-    // Thanks, Javascript.
-    var indices = [];
-    for (var i = 0; i < story_clusters.length; i += 1) {
-      indices.push(i);
-    }
-    indices.forEach(function(i) {
-      var story_oids = story_clusters[i];
-      var feature_fids = feature_fid_clusters[i];
-
-      var t1;
-      var store = Ext.create('Rally.data.lookback.SnapshotStore', {
-        fetch: ['Name', 'FormattedID', 'PlanEstimate', 'Feature'],
-        hydrate: ['Feature'],
-        filters: [
-          {
-            property: 'ObjectID',
-            operator: 'in',
-            value: story_oids
-          },
-          {
-            property: '_ValidFrom',
-            operator: '>',
-            value: release.record.raw.ReleaseStartDate
-          },
-          {
-            property: '_ValidFrom',
-            operator: '<',
-            value: release.record.raw.ReleaseDate
-          }
-        ],
-        listeners: {
-          load: function(store, lb_data, success) {
-            var t2 = new Date();
-            console.log('Feature estimates query took', (t2 - t1), 'ms, and retrieved', lb_data ? lb_data.length : 0, 'results.');
-
-            remaining_stories -= story_oids.length;
-            that._mask.msg = 'Fetching feature estimates... (' + remaining_stories + ' features remaining)';
-            that._mask.show();
-
-            var done = {};
-            lb_data.forEach(function(m) {
-              if (
-                !done[m.get('ObjectID')] &&
-                m.get('Feature') &&
-                feature_fids[m.get('ObjectID')] &&
-                data[feature_fids[m.get('ObjectID')]]
-              ) {
-                data[feature_fids[m.get('ObjectID')]].scope_est_h += m.get('PlanEstimate');
-                done[m.get('ObjectID')] = true;
-              }
-            });
-
-            if (remaining_stories == 0) {
-              that.build_table(data, that.sort_data(Object.keys(data), data));
-            }
-          }
-        }
-      });
-      t1 = new Date();
-      store.load({ scope: that });
-    });
-  }, */
 
   sort_data: function(fids, data) {
     if (fids.length > 1) {
@@ -354,9 +380,8 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       '<thead><tr>' + 
       '<th class="bold tablecell">Formatted ID</th>' +
       '<th class="bold tablecell">Name</th>' + 
-      '<th class="bold tablecell">Actual Starting Scope</th>' +
+      '<th class="bold tablecell">Estimated Starting Scope</th>' +
       '<th class="bold tablecell">Refined Estimate</th>' + 
-      // '<th class="bold tablecell">Refined Estimate (LBAPI)</th>' +
       '<th class="bold tablecell">Actual Current Scope</th>' +
       '<th class="bold tablecell">Scope Change</th>' +
       '<th class="bold tablecell">Percent Scope Change</th>' +
@@ -364,7 +389,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
 
     var totals = {
       scope_est: 0,
-      // scope_est_h: 0,
       scope_est_a: 0,
       scope_act: 0,
       scope_chg: 0
@@ -379,8 +403,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       table += data[fid].scope_est_a + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_est + '</td>';
-      // table += '<td class="tablecell center">';
-      // table += data[fid].scope_est_h + '</td>';
       table += '<td class="tablecell center">';
       table += data[fid].scope_act + '</td>';
       table += '<td class="tablecell center">';
@@ -406,8 +428,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     table += totals.scope_est_a + '</td>';
     table += '<td class="tablecell bold">';
     table += totals.scope_est + '</td>';
-    // table += '<td class="tablecell bold">';
-    // table += totals.scope_est_h + '</td>';
     table += '<td class="tablecell bold">';
     table += totals.scope_act + '</td>';
     table += '<td class="tablecell bold">';
