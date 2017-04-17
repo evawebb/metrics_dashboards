@@ -422,7 +422,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
       xtype: 'rallycombobox',
       itemId: 'artifact_select',
       fieldLabel: 'Artifact type(s):',
-      store: ['Just stories', 'Just defects', 'Just CV defects', 'Both'],
+      store: ['All', 'Just stories', 'Just defects', 'Just CV defects'],
       listeners: {
         change: {
           fn: that.change_story_types.bind(that)
@@ -440,7 +440,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     });
 
     this.deltas = deltas;
-    this.artifact_type = 'u';
+    this.artifact_type = 'b';
     this.graph_type = 'Total points';
 
     this.build_charts(deltas, this.graph_type, this.artifact_type);
@@ -479,7 +479,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     } else if (artifact_type == 'c') {
       title_type = 'Customer Voice Defects';
     } else if (artifact_type == 'b') {
-      title_type = 'Both';
+      title_type = 'All';
     }
 
     var chart_config = {
