@@ -14,9 +14,10 @@ initiative = File.open("dashboards/initiative.js", "r").read
 scope_change = File.open("dashboards/scope_change.js", "r").read
 team = File.open("dashboards/team.js", "r").read
 weekly = File.open("dashboards/weekly_throughput.js", "r").read
+feature_complete = File.open("dashboards/feature_complete.js", "r").read
 
 team_dashboards = [all_work, cumulative_work, team_progress, team, weekly].join("\n")
-program_dashboards = [all_work, feature, initiative, scope_change, weekly].join("\n")
+program_dashboards = [all_work, feature, initiative, scope_change, weekly, feature_complete].join("\n")
 
 team_menu = File.open("menus/team.html", "r").read
   .gsub("\"", "\\\"")
