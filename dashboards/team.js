@@ -738,7 +738,7 @@ Ext.define('ZzacksTeamDashboardApp', {
       stats += '</th>';
     });
     stats += '</tr></thead>';
-    Object.keys(total_stats).forEach(function(t) {
+    Object.keys(total_stats).reverse().forEach(function(t) {
       var ts = total_stats[t];
       stats += '<tr>';
 
