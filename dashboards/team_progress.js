@@ -7,26 +7,11 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     cvdefect: 'CV Defects'
   },
   colors: [
-    '#803e75',
-    '#ffb300',
-    '#ff6800',
-    '#a6bdd7',
-    '#c10020',
-    '#cea262',
-    '#817066',
-    '#007d34',
-    '#f6768e',
-    '#00538a',
-    '#ff7a5c',
-    '#53377a',
-    '#ff8e00',
-    '#b32851',
-    '#f4c800',
-    '#7f180d',
-    '#93aa00',
-    '#593315',
-    '#f13a13',
-    '#232c16'
+    '#803e75', '#ffb300', '#ff6800', '#a6bdd7',
+    '#c10020', '#cea262', '#817066', '#007d34',
+    '#f6768e', '#00538a', '#ff7a5c', '#53377a',
+    '#ff8e00', '#b32851', '#f4c800', '#7f180d',
+    '#93aa00', '#593315', '#f13a13', '#232c16'
   ],
   
   getUserSettingsFields: function() {
@@ -327,35 +312,68 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
   build_table: function(data) {
     var that = this;
 
-    var table = '<div class="center title">Feature Work Progress Table</div>' +
-      '<table class="center"><thead><tr>' +
-      '<th class="bold tablecell">Iteration</th>' +
-      '<th class="bold tablecell">Percent Feature Work Done</th>' +
-      '<th class="bold tablecell">Percent Time</th>' +
-      '<th class="bold tablecell">Cumulative Percent Feature Work Done</th>' +
-      '<th class="bold tablecell">Cumulative Percent Time</th>' +
-      '</tr></thead>';
-
+    var items = [];
     var pts = 0;
     var its = 0;
     Object.keys(data.accepted).forEach(function(it) {
       pts += data.accepted[it].amt;
       its += 1;
 
-      table += '<tr>';
-      table += '<td class="tablecell">' + it + '</td>';
-      table += '<td class="tablecell">' + (data.accepted[it].amt / data.total_planned * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (1 / Object.keys(data.accepted).length * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (pts / data.total_planned * 100).toFixed(2) + '%</td>';
-      table += '<td class="tablecell">' + (its / Object.keys(data.accepted).length * 100).toFixed(2) + '%</td>';
-      table += '</tr>';
+      items.push({
+        iteration: it,
+        percent_done: data.accepted[it].amt / data.total_planned * 100,
+        percent_time: 1 / Object.keys(data.accepted).length * 100,
+        cumul_done: pts / data.total_planned * 100,
+        cumul_time: its / Object.keys(data.accepted).length * 100
+      });
     });
 
-    table += '</table>';
+    var store = Ext.create('Ext.data.Store', {
+      fields: Object.keys(items[0]),
+      data: { items: items },
+      proxy: {
+        type: 'memory',
+        reader: {
+          type: 'json',
+          root: 'items'
+        }
+      }
+    });
 
-    this.add({
-      xtype: 'component',
-      html: table
+    var renderer = function(v) {
+      return '' + v.toFixed(2) + '%';
+    };
+    var w = 150;
+    that.add({
+      xtype: 'gridpanel',
+      title: 'Feature Work Progress Table',
+      store: store,
+      columns: [{
+        text: 'Iteration',
+        dataIndex: 'iteration',
+        width: w
+      }, {
+        text: 'Percent Feature<br />Work Done',
+        dataIndex: 'percent_done',
+        width: w,
+        renderer: renderer
+      }, {
+        text: 'Percent Time',
+        dataIndex: 'percent_time',
+        width: w,
+        renderer: renderer
+      }, {
+        text: 'Cumulative Percent<br />Feature Work Done',
+        dataIndex: 'cumul_done',
+        width: w,
+        renderer: renderer
+      }, {
+        text: 'Cumulative<br />Percent Time',
+        dataIndex: 'cumul_time',
+        width: w,
+        renderer: renderer
+      }],
+      width: 5 * w + 2
     });
   },
 
