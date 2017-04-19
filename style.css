@@ -33,3 +33,11 @@ table {
   font-style: italic;
   color: #808080;
 }
+
+.x-grid-cell-inner {
+  text-align: center !important;
+}
+
+.x-column-header-inner {
+  text-align: center;
+}

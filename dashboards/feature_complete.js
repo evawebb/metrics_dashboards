@@ -208,8 +208,8 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     var that = this;
 
     var store = Ext.create('Ext.data.Store', {
-      fields: that.columns.map(function(c) { return c.key }),
-      data: { items: features.map(function(r) { return r.data}) },
+      fields: that.columns.map(function(c) { return c.key; }),
+      data: { items: features.map(function(r) { return r.data; }) },
       proxy: {
         type: 'memory',
         reader: {
@@ -232,7 +232,8 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
           text: c.name, 
           dataIndex: c.key, 
           renderer: c.renderer ? that.percent_renderer : null,
-          width: c.width
+          width: c.width,
+          align: 'center'
         };
       }),
       width: w

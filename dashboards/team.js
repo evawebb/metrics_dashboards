@@ -19,31 +19,31 @@ Ext.define('ZzacksTeamDashboardApp', {
   ],
   cycle_time_start_state: 'Started',
   cycle_time_end_state: 'Released',
-  columns_big: {
-    'FormattedID':      { key: 'FormattedID',    center: true },
-    'Type':             { key: '_type',          center: true },
-    'Name':             { key: 'Name',           center: false },
-    'Estimate':         { key: 'PlanEstimate',   center: true },
-    'Created':          { key: 'CreatedDate',    center: true, date: true },
-    'Defined':          { key: 'DefinedDate',    center: true, date: true },
-    'Started':          { key: 'StartedDate',    center: true, date: true },
-    'Completed':        { key: 'CompletedDate',  center: true, date: true },
-    'Accepted':         { key: 'AcceptedDate',   center: true, date: true },
-    'Released':         { key: 'ReleasedDate',   center: true, date: true },
-    'Backtracks':       { key: 'BackCount',      center: true },
-    'Skipped':          { key: 'Skipped',        center: true },
-    'Cycle Time':       { key: 'CycleTime',      center: true },
-    'Resolution':       { key: 'Resolution',     center: false }
-  },
-  columns_stats: {
-    'Type':                 { key: 'name' },
-    'Accepted Throughput':  { key: 'throughput_a',  label: true },
-    'Released Throughput':  { key: 'throughput_r',  label: true, highlight: true },
-    'Cycle Time Avg.':      { key: 'cycle_time',    time: true, highlight: true },
-    'Cycle Time Median':    { key: 'median_ct',     time: true, highlight: true },
-    'Weekly Released Avg.': { key: 'weekly_r',      label: true },
-    'Skipped':              { key: 'skipped',       label: true }
-  },
+  columns_big: [
+    { name: 'Formatted ID',      key: 'FormattedID',   width:  80, center: true },
+    { name: 'Type',              key: '_type',         width:  70, center: true },
+    { name: 'Name',              key: 'Name',          width: 300, center: false },
+    { name: 'Estimate',          key: 'PlanEstimate',  width:  60, center: true },
+    { name: 'Created',           key: 'CreatedDate',   width:  80, center: true, date: true },
+    { name: 'Defined',           key: 'DefinedDate',   width:  80, center: true, date: true },
+    { name: 'Started',           key: 'StartedDate',   width:  80, center: true, date: true },
+    { name: 'Completed',         key: 'CompletedDate', width:  80, center: true, date: true },
+    { name: 'Accepted',          key: 'AcceptedDate',  width:  80, center: true, date: true },
+    { name: 'Released',          key: 'ReleasedDate',  width:  80, center: true, date: true },
+    { name: 'Back-<br />tracks', key: 'BackCount',     width:  60, center: true },
+    { name: 'Skipped',           key: 'Skipped',       width:  60, center: true },
+    { name: 'Cycle<br />Time',   key: 'CycleTime',     width:  50, center: true },
+    { name: 'Resolution',        key: 'Resolution',    width:  80, center: false }
+  ],
+  columns_stats: [
+    { name: 'Type',                      key: 'name' },
+    { name: 'Accepted<br />Throughput',  key: 'throughput_a',  label: true },
+    { name: 'Released<br />Throughput',  key: 'throughput_r',  label: true },
+    { name: 'Cycle Time Avg.',           key: 'cycle_time',    time: true },
+    { name: 'Cycle Time<br />Median',    key: 'median_ct',     time: true },
+    { name: 'Weekly<br />Released Avg.', key: 'weekly_r',      label: true },
+    { name: 'Skipped',                   key: 'skipped',       label: true }
+  ],
   months: [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
@@ -51,26 +51,11 @@ Ext.define('ZzacksTeamDashboardApp', {
   complete_dates: true,
   cycle_time_threshold: 25,
   colors: [
-    '#ffb300',
-    '#803e75',
-    '#ff6800',
-    '#a6bdd7',
-    '#c10020',
-    '#cea262',
-    '#817066',
-    '#007d34',
-    '#f6768e',
-    '#00538a',
-    '#ff7a5c',
-    '#53377a',
-    '#ff8e00',
-    '#b32851',
-    '#f4c800',
-    '#7f180d',
-    '#93aa00',
-    '#593315',
-    '#f13a13',
-    '#232c16'
+    '#ffb300', '#803e75', '#ff6800', '#a6bdd7',
+    '#c10020', '#cea262', '#817066', '#007d34',
+    '#f6768e', '#00538a', '#ff7a5c', '#53377a',
+    '#ff8e00', '#b32851', '#f4c800', '#7f180d',
+    '#93aa00', '#593315', '#f13a13', '#232c16'
   ],
 
   getUserSettingsFields: function() {
@@ -481,14 +466,14 @@ Ext.define('ZzacksTeamDashboardApp', {
 
     // Make the type more readable and color the row based on the type.
     if (story._type == 'hierarchicalrequirement') {
-      story._type = 'S';
+      story._type = 'Story';
       story.color = '#ffffff';
     } else if (story._type == 'defect') {
       if (story.Tags.indexOf('Customer Voice') == -1) {
-        story._type = 'D';
+        story._type = 'Defect';
         story.color = '#ffa500';
       } else {
-        story._type = 'C';
+        story._type = 'CV Defect';
         story.color = '#ff83fa';
       }
     }
@@ -594,9 +579,9 @@ Ext.define('ZzacksTeamDashboardApp', {
     this._mask.show();
     var that = this;
     total_stats = {
-      C: { name: 'CV Defects', skipped: 0 },
-      D: { name: 'Defects', skipped: 0 },
-      S: { name: 'Stories', skipped: 0 }
+      'CV Defect': { name: 'CV Defects', skipped: 0 },
+      'Defect': { name: 'Defects', skipped: 0 },
+      'Story': { name: 'Stories', skipped: 0 }
     };
 
     // Filter out artifacts that lack a StartedDate.
@@ -683,11 +668,11 @@ Ext.define('ZzacksTeamDashboardApp', {
     this.removeAll();
     this.add_settings_link();
     this.build_stats_table(total_stats);
-    this.build_table(stories);
     this.create_options(stories);
     this.build_plot(stories);
     this.build_flow_dia(stories);
     this.build_kanban_dia(stories);
+    this.build_table(stories);
     this._mask.hide();
     this.locked = false;
   },
@@ -712,6 +697,10 @@ Ext.define('ZzacksTeamDashboardApp', {
   create_options: function(stories) {
     var that = this;
     this.add({
+      xtype: 'component',
+      html: '<hr />'
+    });
+    this.add({
       xtype: 'rallycombobox',
       itemId: 'bubble_select',
       fieldLabel: 'Color bubbles by:',
@@ -729,43 +718,45 @@ Ext.define('ZzacksTeamDashboardApp', {
   build_stats_table: function(total_stats) {
     var that = this;
 
-    // The table-wide statistics.
-    var stats = '<br /><div class="center title">Throughput Table</div>';
-    stats += '<table class="center"><thead><tr>';
-    Object.keys(that.columns_stats).forEach(function(k) {
-      stats += '<th class="bold tablecell">';
-      stats += k;
-      stats += '</th>';
+    var items = Object.keys(total_stats).reverse().map(function(k) {
+      return total_stats[k];
     });
-    stats += '</tr></thead>';
-    Object.keys(total_stats).reverse().forEach(function(t) {
-      var ts = total_stats[t];
-      stats += '<tr>';
-
-      Object.keys(that.columns_stats).forEach(function(k) {
-        var d = ts[that.columns_stats[k].key];
-        stats += '<td class="tablecell center' +
-          (that.columns_stats[k].highlight ?
-            ' highlight"' :
-            '"') +
-          '>';
-        if (that.columns_stats[k].label) {
-          stats += that.label_datum(d.toLocaleString(), t);
-        } else if (that.columns_stats[k].time) {
-          stats += that.format_ms(d, 'ceil');
-        } else {
-          stats += d;
+    var store = Ext.create('Ext.data.Store', {
+      fields: that.columns_stats.map(function(c) { return c.key; }),
+      data: { items: items },
+      proxy: {
+        type: 'memory',
+        reader: {
+          type: 'json',
+          root: 'items'
         }
-        stats += '</td>';
-      });
-
-      stats += '</tr>';
+      }
     });
-    stats += '</table>';
 
-    this.add({
-      xtype: 'component',
-      html: stats
+    that.add({
+      xtype: 'gridpanel',
+      title: 'Throughput Table',
+      store: store,
+      columns: that.columns_stats.map(function(c) {
+        var renderer = null;
+        if (c.label) {
+          renderer = function(v) {
+            return '' + v.toFixed(2) + ' artifacts';
+          };
+        } else if (c.time) {
+          renderer = function(v) {
+            return that.format_ms(v, 'ceil');
+          };
+        }
+          
+        return {
+          text: c.name,
+          dataIndex: c.key,
+          renderer: renderer,
+          width: 100
+        };
+      }),
+      width: 702
     });
   },
 
@@ -773,53 +764,49 @@ Ext.define('ZzacksTeamDashboardApp', {
   build_table: function(stories) {
     var that = this;
 
-    // The toggle button.
-    var button = '<br /><a id="toggle_link" href="javascript:;" onclick="toggle_big_table()">Show all stories</a><br />';
-
-    // The table.
-    var table = '<table style="display: none" id="big_table"><thead><tr><th class="tablecell">' +
-      Object.keys(this.columns_big).join('</th><th class="tablecell">') +
-      '</th></tr></thead>';
-    stories.forEach(function(story) {
-      table += that.build_table_row(story);
-    });
-    table += '</table><hr />';
-
-    this.add({
-      xtype: 'component',
-      html: button + table
-    });
-  },
-
-  // Given a story object, build an HTML row showing the relevant data.
-  build_table_row: function(story) {
-    var data = story;
-    var row = '<tr>';
-    var that = this;
-
-    Object.keys(this.columns_big).forEach(function(col) {
-      var datum = data[that.columns_big[col].key];
-      var center = that.columns_big[col].center;
-      var filled = false;
-      if (!datum) {
-        datum = '';
-      } else if (that.columns_big[col].date) {
-        filled = data[that.columns_big[col].key + 'Filled'];
-        datum = datum.toDateString();
+    var store = Ext.create('Ext.data.Store', {
+      fields: that.columns_big.map(function(c) { return c.key; }),
+      data: { items: stories },
+      proxy: {
+        type: 'memory',
+        reader: {
+          type: 'json',
+          root: 'items'
+        }
       }
-
-      row += ('<td class="tablecell ' +
-        (center ? 'center ' : '') +
-        (filled ? 'filled ' : '') +
-        '" ' +
-        ('bgcolor="' + data.color + '" ') +
-        '>' +
-        datum +
-        '</td>'
-      );
     });
 
-    return row;
+    var w = 2;
+    that.columns_big.forEach(function(c) {
+      w += c.width;
+    });
+    that.add({
+      xtype: 'gridpanel',
+      title: 'All Artifacts',
+      store: store,
+      columns: that.columns_big.map(function(c) {
+        var renderer = null;
+        if (c.date) {
+          renderer = function(v) {
+            if (v) {
+              return v.toDateString().replace(/ \d{4}/, function(match) {
+                return '<br />' + match.substr(1);
+              });
+            } else {
+              return '';
+            }
+          };
+        }
+
+        return {
+          text: c.name,
+          dataIndex: c.key,
+          renderer: renderer,
+          width: c.width
+        };
+      }),
+      width: w
+    });
   },
 
   // Make a scatter plot.
@@ -845,7 +832,7 @@ Ext.define('ZzacksTeamDashboardApp', {
           }
         ]
       };
-      var indices = ['S', 'D', 'C'];
+      var indices = ['Story', 'Defect', 'CV Defect'];
     } else {
       indices = ['No feature'];
       stories.forEach(function(s) {
