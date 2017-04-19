@@ -47,6 +47,10 @@
         Rally.getApp('ZzacksTeamProgressDashboardApp').refresh();
       }
 
+      function refresh_feature_complete() {
+        Rally.getApp('ZzacksFeatureCompleteDashboardApp').refresh();
+      }
+
       function load_menu() {
         var b = document.getElementById("the_body");
         b.innerHTML = "<!-- put the menu here -->";

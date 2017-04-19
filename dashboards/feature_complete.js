@@ -30,7 +30,23 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
 
     var that = this;
     this.start(function() {
-      that.fetch_features(that.getContext().getTimeboxScope());
+      that.ts = that.getContext().getTimeboxScope();
+      that.fetch_features(that.ts);
+    });
+  },
+
+  onTimeboxScopeChange: function(ts) {
+    var that = this;
+    this.start(function() {
+      that.ts = ts;
+      that.fetch_features(ts);
+    });
+  },
+
+  refresh: function() {
+    var that = this;
+    this.start(function() {
+      that.fetch_features(that.ts);
     });
   },
 
@@ -113,6 +129,13 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     summary.percent_complete_stories = summary.features_complete_stories / summary.total_features;
     summary.percent_complete_points = summary.features_complete_points / summary.total_features;
     summary.percent_complete_all_points = summary.total_complete_points / summary.total_points;
+
+    that.removeAll();
+
+    that.add({
+      xtype: 'component',
+      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature_complete()">Refresh this dashboard</a><hr />'
+    });
 
     that.build_summary_table(summary);
     that.build_feature_table(features);
