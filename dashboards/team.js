@@ -22,7 +22,7 @@ Ext.define('ZzacksTeamDashboardApp', {
   columns_big: [
     { name: 'Formatted ID',      key: 'FormattedID',   width:  80, center: true },
     { name: 'Type',              key: '_type',         width:  70, center: true },
-    { name: 'Name',              key: 'Name',          width: 300, center: false },
+    { name: 'Name',              key: 'Name',          width: 200, center: false },
     { name: 'Estimate',          key: 'PlanEstimate',  width:  60, center: true },
     { name: 'Created',           key: 'CreatedDate',   width:  80, center: true, date: true },
     { name: 'Defined',           key: 'DefinedDate',   width:  80, center: true, date: true },

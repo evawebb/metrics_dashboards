@@ -3,26 +3,28 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   scopeType: 'release',
   histories_cluster_size: 200,
   colors: [
-    '#ffb300',
-    '#803e75',
-    '#ff6800',
-    '#a6bdd7',
-    '#c10020',
-    '#cea262',
-    '#817066',
-    '#007d34',
-    '#f6768e',
-    '#00538a',
-    '#ff7a5c',
-    '#53377a',
-    '#ff8e00',
-    '#b32851',
-    '#f4c800',
-    '#7f180d',
-    '#93aa00',
-    '#593315',
-    '#f13a13',
-    '#232c16'
+    '#ffb300', '#803e75', '#ff6800', '#a6bdd7',
+    '#c10020', '#cea262', '#817066', '#007d34',
+    '#f6768e', '#00538a', '#ff7a5c', '#53377a',
+    '#ff8e00', '#b32851', '#f4c800', '#7f180d',
+    '#93aa00', '#593315', '#f13a13', '#232c16'
+  ],
+  columns: [
+    { text: 'Formatted ID',                       dataIndex: 'fid',           width:  80 },
+    { text: 'Name',                               dataIndex: 'name',          width: 260 },
+    { text: 'Estimated<br />Starting<br />Scope', dataIndex: 'scope_est_a',   width:  80 },
+    { text: 'Refined<br />Estimate',              dataIndex: 'scope_est',     width:  80 },
+    { text: 'Actual<br />Current Scope',          dataIndex: 'scope_act',     width:  80 },
+    { text: 'Scope Change',                       dataIndex: 'scope_chg',     width:  80 },
+    { text: 'Percent<br />Scope Change',          dataIndex: 'scope_chg_pct', width: 100, renderer:
+      function(v) {
+        if (v || v === 0) {
+          return '' + v.toFixed(2) + '%';
+        } else {
+          return '';
+        }
+      }
+    }
   ],
 
   getUserSettingsFields: function() {
@@ -335,6 +337,10 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
 
           if (remaining_features == 0) {
             that.removeAll();
+            this.add({
+              xtype: 'component',
+              html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
+            });
             var sorted_ffids = that.sort_data(Object.keys(data), data);
             that.build_table(data, sorted_ffids);
             that.build_chart(release, data, sorted_ffids.slice(0, 10));
@@ -370,81 +376,43 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   },
 
   build_table: function(data, fids) {
-    this._mask.msg = 'Building table...';
-    this._mask.show();
-
     var that = this;
+    that._mask.msg = 'Building table...';
+    that._mask.show();
 
-    var table = '<div class="center title">Scope Change by Feature</div>' +
-      '<table class="center">' +
-      '<thead><tr>' + 
-      '<th class="bold tablecell">Formatted ID</th>' +
-      '<th class="bold tablecell">Name</th>' + 
-      '<th class="bold tablecell">Estimated Starting Scope</th>' +
-      '<th class="bold tablecell">Refined Estimate</th>' + 
-      '<th class="bold tablecell">Actual Current Scope</th>' +
-      '<th class="bold tablecell">Scope Change</th>' +
-      '<th class="bold tablecell">Percent Scope Change</th>' +
-      '</tr></thead>';
-
-    var totals = {
-      scope_est: 0,
-      scope_est_a: 0,
-      scope_act: 0,
-      scope_chg: 0
-    };
+    var items = [];
     fids.forEach(function(fid) {
-      table += '<tr>';
-      table += '<td class="tablecell center">';
-      table += fid + '</td>';
-      table += '<td class="tablecell center">';
-      table += data[fid].name + '</td>';
-      table += '<td class="tablecell center">';
-      table += data[fid].scope_est_a + '</td>';
-      table += '<td class="tablecell center">';
-      table += data[fid].scope_est + '</td>';
-      table += '<td class="tablecell center">';
-      table += data[fid].scope_act + '</td>';
-      table += '<td class="tablecell center">';
-      table += data[fid].scope_chg + '</td>';
-      table += '<td class="tablecell center">';
-      if (data[fid].scope_est > 0) {
-        table += (data[fid].scope_chg / data[fid].scope_est * 100).toFixed(2) + '%</td>';
-      } else {
-        table += '</td>';
-      }
-      table += '</tr>';
-
-      Object.keys(totals).forEach(function(k) {
-        totals[k] += data[fid][k];
+      items.push({
+        fid: fid,
+        name: data[fid].name,
+        scope_est_a: data[fid].scope_est_a,
+        scope_est: data[fid].scope_est,
+        scope_act: data[fid].scope_act,
+        scope_chg: data[fid].scope_chg,
+        scope_chg_pct: (data[fid].scope_est > 0) ?
+          data[fid].scope_chg / data[fid].scope_est * 100 : ''
       });
     });
-    table += '<tr>';
-    table += '<td class="tablecell bold">';
-    table += '</td>';
-    table += '<td class="tablecell bold">';
-    table += 'Total</td>';
-    table += '<td class="tablecell bold">';
-    table += totals.scope_est_a + '</td>';
-    table += '<td class="tablecell bold">';
-    table += totals.scope_est + '</td>';
-    table += '<td class="tablecell bold">';
-    table += totals.scope_act + '</td>';
-    table += '<td class="tablecell bold">';
-    table += totals.scope_chg + '</td>';
-    table += '<td class="tablecell bold">';
-    table += (totals.scope_chg / totals.scope_est * 100).toFixed(2) + '%</td>';
-    table += '</tr>';
-
-    table += '</table>';
-
-    this.add({
-      xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
+    var store = Ext.create('Ext.data.Store', {
+      fields: Object.keys(items[0]),
+      data: { items: items },
+      proxy: {
+        type: 'memory',
+        reader: {
+          type: 'json',
+          root: 'items'
+        }
+      }
     });
-    this.add({
-      xtype: 'component',
-      html: table
+
+    var w = 2;
+    that.columns.forEach(function(c) { w += c.width; });
+    that.add({
+      xtype: 'gridpanel',
+      title: 'Scope Change by Feature',
+      store: store,
+      columns: that.columns,
+      width: w
     });
   },
 
