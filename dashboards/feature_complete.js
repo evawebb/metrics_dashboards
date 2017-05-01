@@ -6,6 +6,7 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     { name: 'Rank', key: 'Rank', width: 40 },
     { name: 'Formatted<br />ID', key: 'FormattedID', width: 70 },
     { name: 'Name', key: 'Name', width: 400 },
+    { name: 'Initiative', key: 'Initiative', width: 70 },
     { name: 'Completed<br />Points', key: 'AcceptedLeafStoryPlanEstimateTotal', width: 70 },
     { name: 'Total<br />Planned<br />Points', key: 'LeafStoryPlanEstimateTotal', width: 70 },
     { name: 'Percent<br />Done<br />(points)', key: 'PercentDoneByStoryPlanEstimate', renderer: true, width: 70 },
@@ -31,7 +32,7 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     var that = this;
     this.start(function() {
       that.ts = that.getContext().getTimeboxScope();
-      that.fetch_features(that.ts);
+      that.fetch_features(that.ts, 'All initiatives');
     });
   },
 
@@ -59,7 +60,7 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     }
   },
 
-  fetch_features: function(release) {
+  fetch_features: function(release, init_filter) {
     var that = this;
     that._mask.msg = 'Fetching features...';
     that._mask.show();
@@ -67,7 +68,7 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
     var store = Ext.create('Rally.data.wsapi.artifact.Store', {
       models: ['PortfolioItem/Feature'],
       fetch: [
-        'FormattedID', 'Name', 'Release', 'DragAndDropRank',
+        'FormattedID', 'Name', 'Release', 'DragAndDropRank', 'Parent',
         'PercentDoneByStoryCount', 'PercentDonebyStoryPlanEstimate',
         'LeafStoryCount', 'LeafStoryPlanEstimateTotal',
         'AcceptedLeafStoryCount', 'AcceptedLeafStoryPlanEstimateTotal'
@@ -90,14 +91,35 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
         console.log('Features query took', (t2 - t1), 'ms, and retrieved', records ? records.length : 0, 'results.');
 
         if (operation.wasSuccessful()) {
-          that.calculate_data(records);
+          that.calculate_data(records, init_filter);
         }
       }
     });
   },
 
-  calculate_data: function(features) {
+  calculate_data: function(features, init_filter) {
     var that = this;
+
+    var init_list = ['All initiatives'];
+    var init_sel = init_list[0];
+    features.forEach(function(f) {
+      if (f.get('Parent')) {
+        var fid = f.get('Parent').FormattedID;
+        var itag = fid + ': ' + f.get('Parent').Name;
+        if (init_list.indexOf(itag) < 0) {
+          init_list.push(itag);
+        }
+        if (init_filter == fid) {
+          init_sel = itag;
+        }
+      }
+    });
+
+    if (init_filter != 'All initiatives') {
+      features = features.filter(function(f) {
+        return f.get('Parent') && f.get('Parent').FormattedID == init_filter;
+      });
+    }
 
     var summary = {
       features_complete_stories: 0,
@@ -125,6 +147,10 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
       }
 
       r += 1;
+
+      if (f.get('Parent')) {
+        f.data.Initiative = f.get('Parent').FormattedID;
+      }
     });
     summary.percent_complete_stories = summary.features_complete_stories / summary.total_features;
     summary.percent_complete_points = summary.features_complete_points / summary.total_features;
@@ -137,6 +163,18 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
       html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature_complete()">Refresh this dashboard</a><hr />'
     });
 
+    that.change_init = false;
+    that.add({
+      xtype: 'rallycombobox',
+      itemId: 'initiative_select',
+      fieldLabel: 'Filter by initiative',
+      store: init_list,
+      value: init_sel,
+      listeners: { change: {
+        fn: that.change_initiative.bind(that)
+      }}
+    });
+    that.change_init = true;
     that.build_summary_table(summary);
     that.build_feature_table(features);
 
@@ -232,11 +270,23 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
           text: c.name, 
           dataIndex: c.key, 
           renderer: c.renderer ? that.percent_renderer : null,
-          width: c.width,
-          align: 'center'
+          width: c.width
         };
       }),
       width: w
     });
+  },
+
+  change_initiative: function(t, new_item, old_item, e) {
+    if (this.change_init) {
+      if (new_item.indexOf(':') >= 0) {
+        new_item = new_item.split(':')[0];
+      }
+
+      var that = this;
+      this.start(function() {
+        that.fetch_features(that.ts, new_item);
+      });
+    }
   }
 });
