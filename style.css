@@ -41,3 +41,8 @@ table {
 .x-column-header-inner {
   text-align: center;
 }
+
+.x-grid {
+  text-align: center;
+  margin: 0 auto;
+}
