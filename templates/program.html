@@ -4,6 +4,8 @@
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
+      var master_release;
+
       function launch_app(app_name) {
         if (!Rally.getApp(app_name)) {
           Rally.launchApp(app_name);
@@ -17,24 +19,54 @@
         Rally.getApp('ZzacksFeatureDashboardApp').refresh();
       }
 
+      function close_feature() {
+        Rally.destroyApp('ZzacksFeatureDashboardApp');
+        load_menu();
+      }
+
       function refresh_initiative() {
         Rally.getApp('ZzacksInitiativeDashboardApp').refresh();
+      }
+
+      function close_initiative() {
+        Rally.destroyApp('ZzacksInitiativeDashboardApp');
+        load_menu();
       }
 
       function refresh_all_work() {
         Rally.getApp('ZzacksAllWorkDashboardApp').refresh();
       }
 
+      function close_all_work() {
+        Rally.destroyApp('ZzacksAllWorkDashboardApp');
+        load_menu();
+      }
+
       function refresh_weekly() {
         Rally.getApp('ZzacksWeeklyThroughputDashboardApp').refresh();
+      }
+
+      function close_weekly() {
+        Rally.destroyApp('ZzacksWeeklyThroughputDashboardApp');
+        load_menu();
       }
 
       function refresh_scope_change() {
         Rally.getApp('ZzacksScopeChangeDashboardApp').refresh();
       }
 
+      function close_scope_change() {
+        Rally.destroyApp('ZzacksScopeChangeDashboardApp');
+        load_menu();
+      }
+
       function refresh_feature_complete() {
         Rally.getApp('ZzacksFeatureCompleteDashboardApp').refresh();
+      }
+
+      function close_feature_complete() {
+        Rally.destroyApp('ZzacksFeatureCompleteDashboardApp');
+        load_menu();
       }
 
       function load_menu() {

@@ -4,17 +4,7 @@
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
-      function toggle_big_table() {
-        var t = document.getElementById("big_table");
-        var l = document.getElementById("toggle_link");
-        if (t.style.display == "inline") {
-          t.style.display = "none";
-          l.innerHTML = "Show all stories";
-        } else {
-          t.style.display = "inline";
-          l.innerHTML = "Hide all stories";
-        }
-      }
+      var master_release;
 
       function toggle_iteration_settings() {
         var l = document.getElementById("iteration_toggle_link");
@@ -31,24 +21,54 @@
         Rally.getApp('ZzacksTeamDashboardApp').refresh();
       }
 
+      function close_team() {
+        Rally.destroyApp('ZzacksTeamDashboardApp');
+        load_menu();
+      }
+
       function refresh_all_work() {
         Rally.getApp('ZzacksAllWorkDashboardApp').refresh();
+      }
+
+      function close_all_work() {
+        Rally.destroyApp('ZzacksAllWorkDashboardApp');
+        load_menu();
       }
 
       function refresh_weekly() {
         Rally.getApp('ZzacksWeeklyThroughputDashboardApp').refresh();
       }
 
+      function close_weekly() {
+        Rally.destroyApp('ZzacksWeeklyThroughputDashboardApp');
+        load_menu();
+      }
+
       function refresh_cumulative_work() {
         Rally.getApp('ZzacksCumulativeWorkDashboardApp').refresh();
+      }
+
+      function close_cumulative_work() {
+        Rally.destroyApp('ZzacksCumulativeWorkDashboardApp');
+        load_menu();
       }
 
       function refresh_team_progress() {
         Rally.getApp('ZzacksTeamProgressDashboardApp').refresh();
       }
 
+      function close_team_progress() {
+        Rally.destroyApp('ZzacksTeamProgressDashboardApp');
+        load_menu();
+      }
+
       function refresh_feature_complete() {
         Rally.getApp('ZzacksFeatureCompleteDashboardApp').refresh();
+      }
+
+      function close_feature_complete() {
+        Rally.destroyApp('ZzacksFeatureCompleteDashboardApp');
+        load_menu();
       }
 
       function load_menu() {

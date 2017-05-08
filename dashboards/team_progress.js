@@ -31,12 +31,13 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
 
     this.start(function() {
       that.first_run = true;
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.fetch_iterations(that.ts, [], true);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
+    master_release = ts;
     var that = this;
     this.start(function() {
       that.first_run = true;
@@ -156,7 +157,7 @@ Ext.define('ZzacksTeamProgressDashboardApp', {
     var lt = that.first_run ? 'Show iteration selector' : 'Hide iteration selector';
     that.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team_progress()">Refresh this dashboard</a><br /><a id="iteration_toggle_link" href="javascript:void(0);" onclick="toggle_iteration_settings()">' + lt + '</a>'
+      html: '<a href="javascript:void(0);" onClick="close_team_progress()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team_progress()">Refresh this dashboard</a><br /><a id="iteration_toggle_link" href="javascript:void(0);" onclick="toggle_iteration_settings()">' + lt + '</a>'
     });
 
     var checkboxes = [];

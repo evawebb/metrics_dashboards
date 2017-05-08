@@ -24,12 +24,13 @@ Ext.define('ZzacksFeatureDashboardApp', {
 
     var that = this;
     this.start(function() {
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.clean_cached_data(that.ts);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
+    master_release = ts;
     this._mask.show();
     var that = this;
     this.start(function() {
@@ -637,7 +638,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_feature()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',

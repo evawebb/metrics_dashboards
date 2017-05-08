@@ -31,12 +31,13 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
 
     var that = this;
     this.start(function() {
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.fetch_features(that.ts, 'All initiatives');
     });
   },
 
   onTimeboxScopeChange: function(ts) {
+    master_release = ts;
     var that = this;
     this.start(function() {
       that.ts = ts;
@@ -160,7 +161,7 @@ Ext.define('ZzacksFeatureCompleteDashboardApp', {
 
     that.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature_complete()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_feature_complete()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_feature_complete()">Refresh this dashboard</a><hr />'
     });
 
     that.change_init = false;

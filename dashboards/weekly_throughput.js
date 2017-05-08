@@ -18,6 +18,10 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
     this.start();
   },
 
+  onTimeboxScopeChange: function(ts) {
+    master_release = ts;
+  },
+
   refresh: function() {
     this.start();
   },
@@ -120,7 +124,7 @@ Ext.define('ZzacksWeeklyThroughputDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_weekly()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_weekly()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_weekly()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',

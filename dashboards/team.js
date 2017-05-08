@@ -32,7 +32,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     { name: 'Released',          key: 'ReleasedDate',  width:  80, center: true, date: true },
     { name: 'Back-<br />tracks', key: 'BackCount',     width:  60, center: true },
     { name: 'Skipped',           key: 'Skipped',       width:  60, center: true },
-    { name: 'Cycle<br />Time',   key: 'CycleTime',     width:  50, center: true },
+    { name: 'Cycle<br />Time',   key: 'CycleTime',     width:  60, center: true },
     { name: 'Resolution',        key: 'Resolution',    width:  80, center: false }
   ],
   columns_stats: [
@@ -109,12 +109,13 @@ Ext.define('ZzacksTeamDashboardApp', {
         msg: 'Please wait...'
       });
       that._mask.show();
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.fetch_iterations(that.ts);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
+    master_release = ts;
     var that = this;
     this.start(function() {
       that._mask.show();
@@ -668,11 +669,11 @@ Ext.define('ZzacksTeamDashboardApp', {
     this.removeAll();
     this.add_settings_link();
     this.build_stats_table(total_stats);
+    this.build_table(stories);
     this.create_options(stories);
     this.build_plot(stories);
     this.build_flow_dia(stories);
     this.build_kanban_dia(stories);
-    this.build_table(stories);
     this._mask.hide();
     this.locked = false;
   },
@@ -698,7 +699,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<hr />'
+      html: '<br /><hr />'
     });
     this.add({
       xtype: 'rallycombobox',
@@ -764,6 +765,20 @@ Ext.define('ZzacksTeamDashboardApp', {
   build_table: function(stories) {
     var that = this;
 
+    that.add({
+      xtype: 'rallybutton',
+      text: 'Show/hide artifacts table',
+      handler: function() {
+        if (that.big_table) {
+          if (that.big_table.hidden) {
+            that.big_table.show();
+          } else {
+            that.big_table.hide();
+          }
+        }
+      }
+    });
+
     var store = Ext.create('Ext.data.Store', {
       fields: that.columns_big.map(function(c) { return c.key; }),
       data: { items: stories },
@@ -780,7 +795,7 @@ Ext.define('ZzacksTeamDashboardApp', {
     that.columns_big.forEach(function(c) {
       w += c.width;
     });
-    that.add({
+    that.big_table = that.add({
       xtype: 'gridpanel',
       title: 'All Artifacts',
       store: store,
@@ -807,6 +822,7 @@ Ext.define('ZzacksTeamDashboardApp', {
       }),
       width: w
     });
+    that.big_table.hide();
   },
 
   // Make a scatter plot.
@@ -885,7 +901,7 @@ Ext.define('ZzacksTeamDashboardApp', {
       });
     });
 
-    this.bubble_chart = this.insert(5, {
+    this.bubble_chart = this.insert(7, {
       xtype: 'rallychart',
       loadMask: false,
       chartData: data,
@@ -1129,7 +1145,7 @@ Ext.define('ZzacksTeamDashboardApp', {
   add_settings_link: function() {
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_team()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_team()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'component',

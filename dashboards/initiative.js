@@ -29,19 +29,16 @@ Ext.define('ZzacksInitiativeDashboardApp', {
 
     var that = this;
     this.start(function() {
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.clean_cached_data(that.ts);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
-    this._mask = new Ext.LoadMask(Ext.getBody(), {
-      msg: 'Please wait...'
-    });
-    this._mask.show();
-
+    master_release = ts;
     var that = this;
     this.start(function() {
+      this._mask.show();
       that.ts = ts;
       that.clean_cached_data(that.ts);
     });
@@ -765,7 +762,7 @@ Ext.define('ZzacksInitiativeDashboardApp', {
   add_settings_link: function() {
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_initiative()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_initiative()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_initiative()">Refresh this dashboard</a><hr />'
     });
   }
 });

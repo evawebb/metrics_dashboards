@@ -41,7 +41,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     });
     this._mask.show();
 
-    var release = this.getContext().getTimeboxScope();
+    var release = master_release || this.getContext().getTimeboxScope();
     var that = this;
     this.start(function() {
       that.release = release;
@@ -50,6 +50,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
   },
 
   onTimeboxScopeChange: function(ts) {
+    master_release = ts;
     var that = this;
     this.start(function() {
       that.release = ts;
@@ -78,7 +79,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     this.removeAll();
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_scope_change()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'component',

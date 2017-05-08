@@ -23,13 +23,14 @@ Ext.define('ZzacksAllWorkDashboardApp', {
 
     var that = this;
     this.start(function() {
-      that.ts = that.getContext().getTimeboxScope();
+      that.ts = master_release || that.getContext().getTimeboxScope();
       that.clean_cached_data(that.ts);
     });
   },
 
   onTimeboxScopeChange: function(ts) {
     this._mask.show();
+    master_release = ts;
     var that = this;
     this.start(function() {
       that.ts = ts;
@@ -416,7 +417,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
     var that = this;
     this.add({
       xtype: 'component',
-      html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
+      html: '<a href="javascript:void(0);" onClick="close_all_work()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_all_work()">Refresh this dashboard</a><hr />'
     });
     this.add({
       xtype: 'rallycombobox',
