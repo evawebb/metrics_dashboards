@@ -9,22 +9,26 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     '#ff8e00', '#b32851', '#f4c800', '#7f180d',
     '#93aa00', '#593315', '#f13a13', '#232c16'
   ],
-  columns: [
-    { text: 'Formatted ID',                       dataIndex: 'fid',           width:  80 },
-    { text: 'Name',                               dataIndex: 'name',          width: 260 },
-    { text: 'Estimated<br />Starting<br />Scope', dataIndex: 'scope_est_a',   width:  80 },
-    { text: 'Refined<br />Estimate',              dataIndex: 'scope_est',     width:  80 },
-    { text: 'Actual<br />Current Scope',          dataIndex: 'scope_act',     width:  80 },
-    { text: 'Scope Change',                       dataIndex: 'scope_chg',     width:  80 },
-    { text: 'Percent<br />Scope Change',          dataIndex: 'scope_chg_pct', width: 100, renderer:
-      function(v) {
-        if (v || v === 0) {
-          return '' + v.toFixed(2) + '%';
-        } else {
-          return '';
-        }
-      }
+  percent_renderer: function(v) {
+    if (v || v === 0) {
+      return '' + v.toFixed(2) + '%';
+    } else {
+      return '';
     }
+  },
+  columns: [
+    { text: 'Formatted ID',                                      dataIndex: 'fid',              width:  80 },
+    { text: 'Name',                                              dataIndex: 'name',             width: 260 },
+    { text: 'Refined<br />Estimate',                             dataIndex: 'scope_est',        width:  80 },
+    { text: 'Estimated<br />Starting<br />Scope',                dataIndex: 'scope_est_a',      width:  80 },
+    { text: 'LBAPI<br />Starting<br />Scope',                    dataIndex: 'scope_est_lb',     width:  80 },
+    { text: 'Actual<br />Current Scope',                         dataIndex: 'scope_act',        width:  80 },
+    { text: 'Scope Change<br />(Refined Est.)',                  dataIndex: 'scope_chg',        width:  80 },
+    { text: 'Percent<br />Scope Change<br />(Refined Estimate)', dataIndex: 'scope_chg_pct',    width: 100, renderer: true },
+    { text: 'Scope Change<br />(Estimated)',                     dataIndex: 'scope_chg_a',      width:  80 },
+    { text: 'Percent<br />Scope Change<br />(Estimated)',        dataIndex: 'scope_chg_pct_a',  width: 100, renderer: true },
+    { text: 'Scope Change<br />(LBAPI)',                         dataIndex: 'scope_chg_lb',     width:  80 },
+    { text: 'Percent<br />Scope Change<br />(LBAPI)',            dataIndex: 'scope_chg_pct_lb', width: 100, renderer: true }
   ],
 
   getUserSettingsFields: function() {
@@ -119,7 +123,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               scope_est: f.get('RefinedEstimate'),
               scope_est_a: 0,
               scope_act: 0,
-              scope_chg: -f.get('RefinedEstimate'),
               progress: {}
             };
           });
@@ -191,7 +194,6 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               var ffid = s.get('Feature').FormattedID;
               if (data[ffid]) {
                 data[ffid].scope_act += s.get('PlanEstimate');
-                data[ffid].scope_chg += s.get('PlanEstimate');
               } else {
                 console.log('Weird story!', s);
               }
@@ -228,10 +230,64 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
               }
             });
 
-            that.fetch_historical_stories(release, features, stories, data);
+            that.fetch_actual_scopes(release, features, stories, data);
           }
         }
       });
+    });
+  },
+
+  fetch_actual_scopes: function(release, features, stories, data) {
+    var remaining_features = features.length;
+    var that = this;
+    that._mask.msg = 'Fetching starting scopes... (' + remaining_features + ' features remaining)';
+    that._mask.show();
+
+    features.forEach(function(f) {
+      var t1 = new Date();
+      var store = Ext.create('Rally.data.lookback.SnapshotStore', {
+        fetch: [
+          'Name', 'FormattedID', 'LeafStoryPlanEstimateTotal'
+        ],
+        hydrate: [],
+        filters: [{
+          property: 'ObjectID',
+          value: f.get('ObjectID')
+        }, {
+          property: '_ValidFrom',
+          operator: '<=',
+          value: release.record.raw.ReleaseStartDate
+        }, {
+          property: '_ValidTo',
+          operator: '>=',
+          value: release.record.raw.ReleaseStartDate
+        }],
+        listeners: { load: function(store, lb_data, success) {
+          var t2 = new Date();
+          console.log('Starting scope query took', (t2 - t1), 'ms, and retrieved', lb_data ? lb_data.length : 0, 'results.');
+
+          if (lb_data.length > 0) {
+            data[f.get('FormattedID')].scope_est_lb = lb_data[0].get('LeafStoryPlanEstimateTotal');
+
+            if (lb_data.length > 1) {
+              console.log('Warning! Multiple starting scope values returned for ' + f.get('FormattedID') + '.');
+            }
+          } else {
+            data[f.get('FormattedID')].scope_est_lb = 0;
+
+            console.log('Warning! No starting scope values returned for ' + f.get('FormattedID') + '.');
+          }
+
+          remaining_features -= 1;
+          that._mask.msg = 'Fetching starting scopes... (' + remaining_features + ' features remaining)';
+          that._mask.show();
+
+          if (remaining_features == 0) {
+            that.fetch_historical_stories(release, features, stories, data);
+          }
+        }}
+      });
+      store.load({ scope: that });
     });
   },
 
@@ -337,11 +393,18 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
           }
 
           if (remaining_features == 0) {
+            Object.keys(data).forEach(function(fid) {
+              data[fid].scope_chg = data[fid].scope_act - data[fid].scope_est;
+              data[fid].scope_chg_a = data[fid].scope_act - data[fid].scope_est_a;
+              data[fid].scope_chg_lb = data[fid].scope_act - data[fid].scope_est_lb;
+            });
+
             that.removeAll();
             this.add({
               xtype: 'component',
               html: '<a href="javascript:void(0);" onClick="load_menu()">Choose a different dashboard</a><br /><a href="javascript:void(0);" onClick="refresh_scope_change()">Refresh this dashboard</a><hr />'
             });
+
             var sorted_ffids = that.sort_data(Object.keys(data), data);
             that.build_table(data, sorted_ffids);
             that.build_chart(release, data, sorted_ffids.slice(0, 10));
@@ -361,7 +424,7 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       var right = [];
 
       for (var i = 1; i < fids.length; i += 1) {
-        if (data[fids[i]].scope_chg > data[pivot].scope_chg) {
+        if (data[fids[i]].scope_chg_lb > data[pivot].scope_chg_lb) {
           left.push(fids[i]);
         } else {
           right.push(fids[i]);
@@ -386,12 +449,19 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
       items.push({
         fid: fid,
         name: data[fid].name,
-        scope_est_a: data[fid].scope_est_a,
         scope_est: data[fid].scope_est,
+        scope_est_a: data[fid].scope_est_a,
+        scope_est_lb: data[fid].scope_est_lb,
         scope_act: data[fid].scope_act,
         scope_chg: data[fid].scope_chg,
         scope_chg_pct: (data[fid].scope_est > 0) ?
-          data[fid].scope_chg / data[fid].scope_est * 100 : ''
+          data[fid].scope_chg / data[fid].scope_est * 100 : '',
+        scope_chg_a: data[fid].scope_chg_a,
+        scope_chg_pct_a: (data[fid].scope_est_a > 0) ?
+          data[fid].scope_chg_a / data[fid].scope_est_a * 100 : '',
+        scope_chg_lb: data[fid].scope_chg_lb,
+        scope_chg_pct_lb: (data[fid].scope_est_lb > 0) ?
+          data[fid].scope_chg_lb / data[fid].scope_est_lb * 100 : '',
       });
     });
     var store = Ext.create('Ext.data.Store', {
@@ -407,7 +477,12 @@ Ext.define('ZzacksScopeChangeDashboardApp', {
     });
 
     var w = 2;
-    that.columns.forEach(function(c) { w += c.width; });
+    that.columns.forEach(function(c) { 
+      if (c.renderer) {
+        c.renderer = that.percent_renderer;
+      }
+      w += c.width; 
+    });
     that.add({
       xtype: 'gridpanel',
       title: 'Scope Change by Feature',
