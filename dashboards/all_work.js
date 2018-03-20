@@ -1,7 +1,7 @@
 Ext.define('ZzacksAllWorkDashboardApp', {
   extend: 'Rally.app.TimeboxScopedApp',
   scopeType: 'release',
-  color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0', '#c0c0ff'],
+  color_list: ['#0000ff', '#ff0000', '#c0c000', '#00ffc0'],
   update_interval: 1 * 60 * 60 * 1000,
   // update_interval: 24 * 60 * 60 * 1000,
   cache_tag: 'cached_data_a_',
@@ -185,7 +185,7 @@ Ext.define('ZzacksAllWorkDashboardApp', {
             }
           }
 
-          that.releases = that.releases.slice(this_release_index, this_release_index + 5);
+          that.releases = that.releases.slice(this_release_index, this_release_index + 4);
 
           that.colors = {};
           for (var i = 0; i < that.releases.length; i += 1) {
