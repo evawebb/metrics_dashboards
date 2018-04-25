@@ -165,7 +165,7 @@ Ext.define('ZzacksFeatureDashboardApp', {
       scope: this,
       callback: function(records, operation) {
         if (operation.wasSuccessful()) {
-          var record_names = [];
+          var record_names = {};
           records.forEach(function(r) {
             if (!record_names[r.get('Name')]) {
               record_names[r.get('Name')] = true;
@@ -178,7 +178,13 @@ Ext.define('ZzacksFeatureDashboardApp', {
           });
 
           that.releases = that.releases.sort(function(a, b) {
-            return b.name.localeCompare(a.name);
+            if (a.start_date > b.start_date) {
+              return -1;
+            } else if (a.start_date == b.start_date) {
+              return 0;
+            } else {
+              return 1;
+            }
           });
 
           var this_release_index = 0;
